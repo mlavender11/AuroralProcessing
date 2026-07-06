@@ -161,7 +161,36 @@ def assert_video_parameters(playback_speed, fps, bin_size, ut):
     return playback_speed, fps, bin_size
 
 
-# TODO add guards to pass 2 of three of bin size, playback speed, and fps
+def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.datetime):
+    if start_time.minute > 0 or start_time.second > 0:
+        first_whole_hour = start_time.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
+        hours = [start_time]
+    else:
+        first_whole_hour = start_time
+        hours = []
+
+    current_hour = first_whole_hour
+
+    while current_hour < end_time:
+        hours.append(current_hour)
+        current_hour += datetime.timedelta(hours=1)
+
+    hours.append(end_time)
+
+    return hours
+
+
+def get_hourly_sub_idx(ut, start_time: datetime.datetime, end_time: datetime.datetime):
+    _assert_utc(start_time)
+    _assert_utc(end_time)
+
+    hours = get_hourly_boundaries(start_time, end_time)
+
+    hour_idxs = [find_closest_item(ut, hour.timestamp()) for hour in hours]
+
+    return hour_idxs
+
+
 def make_video_from_times(
     *,
     hdf_path,
@@ -172,8 +201,8 @@ def make_video_from_times(
     video_quality=6,
     playback_speed=None,
     fps=None,
-    video_lengths_seconds=None,
     norm=None,
+    make_keogram=False,  # TODO make hourly keograms
 ):
     import math
     from itertools import pairwise
@@ -205,16 +234,9 @@ def make_video_from_times(
         if end_time is None:
             end_time = datetime.datetime.fromtimestamp(ut[-1], datetime.timezone.utc)
 
-        real_duration_seconds = (end_time - start_time).total_seconds()
-        n_videos = math.ceil(real_duration_seconds / video_lengths_seconds) if video_lengths_seconds is not None else 1
-
         playback_speed, fps, bin_size = assert_video_parameters(playback_speed, fps, bin_size, ut)
 
-        start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
-        # get start/end indicies of each video segment
-        sub_idx = np.round(np.linspace(start_idx, end_idx, n_videos + 1)).astype(int)
-
-        n_frames_to_process = end_idx - start_idx
+        sub_idx = get_hourly_sub_idx(ut, start_time, end_time)
 
         video_fns = [  # Produce file names for each video. ex. 2013-03-30_8-30-00_9-30-00.mp4
             (
@@ -229,6 +251,7 @@ def make_video_from_times(
 
         # try getting one norm for entire video
         if norm is None:
+            start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
             norm = compute_norm(
                 imgs,
                 ut,
