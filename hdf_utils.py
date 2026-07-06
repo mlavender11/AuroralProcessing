@@ -8,7 +8,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
-from PIL import Image, ImageDraw, ImageFont
+from PIL import ImageFont
 from tqdm.auto import tqdm
 
 _UTC = datetime.UTC
@@ -102,7 +102,7 @@ def find_closest_item(arr, key):
     if idx == 0:
         return idx
     if idx == len(arr):
-        return idx
+        return idx - 1
 
     left, right = idx - 1, idx
     return left if abs(arr[left] - key) <= abs(arr[right] - key) else right
@@ -204,7 +204,6 @@ def make_video_from_times(
     norm=None,
     make_keogram=False,  # TODO make hourly keograms
 ):
-    import math
     from itertools import pairwise
     from pathlib import Path
 
@@ -346,9 +345,6 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
                     print(f"processed {frame_idx} / {n_frames} -- {percent_complete:.0f}% complete")
 
         keogram.finalize()
-
-
-def utc_time_from_string(): ...  # TODO implement - why do I need this?
 
 
 def compute_keogram_bins(n_frames, ut, bin_width_seconds):
