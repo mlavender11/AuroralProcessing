@@ -8,7 +8,6 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
-from matplotlib.ticker import FixedLocator, FuncFormatter
 from PIL import Image, ImageDraw, ImageFont
 from tqdm.auto import tqdm
 
@@ -96,58 +95,6 @@ def get_font(size=16):
         font = ImageFont.load_default()
 
     return font
-
-
-# TODO move to keogram consumer
-def save_keogram_NS_and_EW(*, keogram_NS, keogram_EW, ut_hours, frame_height, frame_width, outfn, cmap, norm, date_str):
-    import math
-
-    # TODO compute norm across keogram only?
-
-    fig, (axNS, axEW) = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
-
-    imNS = axNS.imshow(
-        keogram_NS,
-        aspect="auto",
-        cmap=cmap,
-        origin="lower",
-        extent=[ut_hours[0], ut_hours[-1], 0, frame_height],
-        norm=norm,
-    )
-    axNS.set_ylabel("Y Pixel Index")
-    axNS.set_title("North-South Keogram")
-
-    imEW = axEW.imshow(
-        keogram_EW,
-        aspect="auto",
-        cmap=cmap,
-        origin="lower",
-        extent=[ut_hours[0], ut_hours[-1], 0, frame_width],
-        norm=norm,
-    )
-    axEW.set_ylabel("X Pixel Index")
-    axEW.set_title("East-West Keogram")
-    axEW.set_xlabel("UT Hours")
-
-    ticks = list(
-        np.arange(
-            math.ceil(ut_hours[0] * 2) / 2,
-            ut_hours[-1],
-            0.5,
-        )
-    )
-    if ticks and (ut_hours[-1] - ticks[-1]) < 0.1:
-        ticks.pop()
-    ticks.append(ut_hours[-1])
-
-    axEW.xaxis.set_major_locator(FixedLocator(ticks))
-    axEW.xaxis.set_major_formatter(
-        FuncFormatter(lambda x, pos: f"{math.floor(x) % 24:02d}:{min(round((x % 1) * 60), 59):02d}")
-    )
-
-    fig.suptitle(date_str)
-    plt.savefig(outfn)
-    plt.close(fig)
 
 
 def find_closest_item(arr, key):
