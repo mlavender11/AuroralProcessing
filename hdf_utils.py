@@ -193,6 +193,27 @@ def calculate_bin_size(ut, fps, playback_speed):
     return max(1, round(bin_size))
 
 
+def assert_video_parameters(playback_speed, fps, bin_size, ut):
+    total_given = sum(x is not None for x in [playback_speed, fps, bin_size])
+    if total_given < 2:
+        raise ValueError(
+            f"Only {total_given} parameters entered. Need to input two options: fps = {fps}, playback_speed = {playback_speed}, bin_size = {bin_size}"
+        )
+    elif total_given == 3:
+        raise ValueError(f"Can not enter three parameters. Need to choose two from playback_speed, fps, and bin_size")
+    else:
+        if playback_speed is None:
+            source_seconds_per_frame = np.median(np.diff(ut))
+            playback_speed = fps * source_seconds_per_frame * bin_size
+        if fps is None:
+            fps = calculate_fps(ut, bin_size, playback_speed)
+        if bin_size is None:
+            bin_size = calculate_bin_size(ut, fps, playback_speed)
+            bin_size = max(1, round(bin_size))
+
+    return playback_speed, fps, bin_size
+
+
 # TODO add guards to pass 2 of three of bin size, playback speed, and fps
 def make_video_from_times(
     *,
@@ -201,8 +222,8 @@ def make_video_from_times(
     start_time: datetime.datetime | None = None,
     end_time: datetime.datetime | None = None,
     bin_size=None,
-    video_quality,
-    playback_speed,
+    video_quality=6,
+    playback_speed=None,
     fps=None,
     video_lengths_seconds=None,
     norm=None,
@@ -240,8 +261,7 @@ def make_video_from_times(
         real_duration_seconds = (end_time - start_time).total_seconds()
         n_videos = math.ceil(real_duration_seconds / video_lengths_seconds) if video_lengths_seconds is not None else 1
 
-        fps = calculate_fps(ut, bin_size, playback_speed) if fps is None else fps
-        # bin_size = calculate_bin_size(ut, fps, playback_speed)
+        playback_speed, fps, bin_size = assert_video_parameters(playback_speed, fps, bin_size, ut)
 
         start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
         # get start/end indicies of each video segment
@@ -364,7 +384,6 @@ def utc_time_from_string(): ...  # TODO implement - why do I need this?
 def compute_keogram_bins(n_frames, ut, bin_width_seconds):
     import math
 
-    print(f"binwidthseconds = {bin_width_seconds}")  # TODO remove
     if bin_width_seconds is None:
         return n_frames, 1
     num_seconds = ut[-1] - ut[0]
