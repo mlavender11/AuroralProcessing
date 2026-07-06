@@ -206,9 +206,7 @@ def make_video_from_times(
 ):
     from itertools import pairwise
     from pathlib import Path
-
     import imageio
-
     from .consumers import VideoConsumer
 
     if start_time is not None:
