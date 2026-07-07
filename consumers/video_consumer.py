@@ -35,8 +35,13 @@ class VideoConsumer:
 
 
 def write_video_frame(writer, frame_bin, time_bin, font, frame_to_rgb):
-    frame = frame_bin.mean(axis=0)
-    time_stamp = time_bin.mean()
+    if frame_bin.shape[0] == 1:  # avoid mean function if frames aren't binned
+        frame = frame_bin[0]
+        time_stamp = time_bin[0]
+    else:
+        frame = frame_bin.mean(axis=0)
+        time_stamp = time_bin.mean()
+
     frame = frame_to_rgb(frame)
     frame = add_time_stamp(frame, time_stamp, font)
     writer.append_data(frame)

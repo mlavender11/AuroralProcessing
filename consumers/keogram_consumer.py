@@ -19,10 +19,8 @@ def compute_keogram_bins(n_frames, ut):
     return n_bins, frames_per_bin
 
 
-def save_keogram_NS_and_EW(*, keogram_NS, keogram_EW, ut_hours, frame_height, frame_width, outfn, cmap, norm, date_str):
+def save_keogram_NS_and_EW(*, keogram_NS, keogram_EW, ut_hours, frame_height, frame_width, outfn, cmap, norm, date_str, tick_interval_hours=1/6):
     import math
-
-    # TODO compute norm across keogram only?
 
     fig, (axNS, axEW) = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
 
@@ -49,21 +47,26 @@ def save_keogram_NS_and_EW(*, keogram_NS, keogram_EW, ut_hours, frame_height, fr
     axEW.set_title("East-West Keogram")
     axEW.set_xlabel("UT Hours")
 
-    ticks = list(
-        np.arange(
-            math.ceil(ut_hours[0] * 2) / 2,
-            ut_hours[-1],
-            0.5,
-        )
-    )
-    if ticks and (ut_hours[-1] - ticks[-1]) < 0.1:
-        ticks.pop()
-    ticks.append(ut_hours[-1])
+    # ticks every ten min
+    start, end = ut_hours[0], ut_hours[-1]
+    step = tick_interval_hours
+
+    first_regular_tick = math.ceil(start / step) * step
+    regular_ticks = list(np.arange(first_regular_tick, end, step))
+
+    # avoid a tick landing almost on top of the start/end labels
+    if regular_ticks and (regular_ticks[0] - start) < step / 5:
+        regular_ticks.pop(0)
+    if regular_ticks and (end - regular_ticks[-1]) < step / 5:
+        regular_ticks.pop()
+
+    ticks = [start] + regular_ticks + [end]
 
     axEW.xaxis.set_major_locator(FixedLocator(ticks))
     axEW.xaxis.set_major_formatter(
         FuncFormatter(lambda x, pos: f"{math.floor(x) % 24:02d}:{min(round((x % 1) * 60), 59):02d}")
     )
+    axEW.tick_params(axis="x", labelrotation=45)
 
     fig.suptitle(date_str)
     plt.savefig(outfn)

@@ -287,7 +287,7 @@ def make_hourly_videos_keograms(
     playback_speed=None,
     fps=None,
     norm=None,
-    make_keogram=False,  # TODO make hourly keograms
+    output_hz=None,
 ):
     from itertools import pairwise
     from pathlib import Path
@@ -317,6 +317,15 @@ def make_hourly_videos_keograms(
             end_time = datetime.datetime.fromtimestamp(ut[-1], datetime.timezone.utc)
 
         playback_speed, fps, bin_size = assert_video_parameters(playback_speed, fps, bin_size, ut)
+
+        # downsampling calculations
+
+        if output_hz is not None:
+            native_dt = float(np.median(np.diff(ut)))
+            stride = max(1, round((1 / output_hz) / native_dt))
+            bin_size = 1  # override bin size to 1
+        else:
+            stride = 1
 
         sub_idx = get_hourly_sub_idx(ut, start_time, end_time)
 
@@ -354,7 +363,7 @@ def make_hourly_videos_keograms(
                 video = VideoConsumer(
                     writer, font, frame_to_rgb, height, width, imgs.dtype, ut.dtype, bin_size=bin_size
                 )
-                n_bins, frames_per_bin = compute_keogram_bins(n_frames=sub_end_idx - sub_start_idx + 1, ut=ut)
+                n_bins, frames_per_bin = compute_keogram_bins(n_frames=sub_end_idx - sub_start_idx, ut=ut)
                 keogram = KeogramConsumer(
                     height,
                     width,
@@ -363,13 +372,14 @@ def make_hourly_videos_keograms(
                     cmap=cmap,
                     norm=norm,
                     outfn=keogram_fn,
-                    ut=ut,
+                    ut=ut[sub_start_idx:sub_end_idx],
                 )
 
-                frame_range = range(sub_start_idx, sub_end_idx + 1)
+                frame_range = range(sub_start_idx, sub_end_idx)
                 for n in tqdm(frame_range, desc=fn.name, unit="frame", leave=False):
                     frame, frame_time = imgs[n], ut[n]
-                    video.update(n, frame, frame_time)
+                    if (n - sub_start_idx) % stride == 0:
+                        video.update(n, frame, frame_time)
                     keogram.update(n, frame, frame_time)
                 video.finalize()
                 keogram.finalize()
@@ -428,25 +438,18 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
 
         n_bins = len(start_idxs) - 1
 
-        print("getting norm")
         norm = compute_norm(imgs, ut, 60)  # does htis need to take sample_interval into account?
-        print("norm complete")
         keogram = KeogramConsumer(height, width, n_bins, frames_per_bin_keogram, cmap, norm, keogram_path, ut)
 
-        for start_idx in start_idxs[:-1]:
+        for start_idx in tqdm(start_idxs[:-1], desc="bins", unit="bin"):
             for i in range(frames_per_bin_keogram):
                 frame_idx = start_idx + i
                 frame, time = imgs[frame_idx], ut[frame_idx]
                 keogram.update(i, frame, time)
-
-                percent_complete = 100 * frame_idx / n_frames
-                if percent_complete % 1 == 0:
-                    print(f"processed {frame_idx} / {n_frames} -- {percent_complete:.0f}% complete")
-
         keogram.finalize()
 
 
-def compute_keogram_bins(n_frames, ut, bin_width_seconds):
+def compute_keogram_bins(n_frames, ut, bin_width_seconds=None):
     import math
 
     if bin_width_seconds is None:
