@@ -276,6 +276,107 @@ def make_video_from_times(
         return norm
 
 
+def make_hourly_videos_keograms(
+    *,
+    hdf_path,
+    out_dir,
+    start_time: datetime.datetime | None = None,
+    end_time: datetime.datetime | None = None,
+    bin_size=None,
+    video_quality=6,
+    playback_speed=None,
+    fps=None,
+    norm=None,
+    make_keogram=False,  # TODO make hourly keograms
+):
+    from itertools import pairwise
+    from pathlib import Path
+    import imageio
+    from .consumers import VideoConsumer, KeogramConsumer
+
+    if start_time is not None:
+        _assert_utc(start_time)
+    if end_time is not None:
+        _assert_utc(end_time)
+
+    hdf_path = Path(hdf_path)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    cmap = plt.get_cmap("gray")
+    font = get_font()
+
+    with h5py.File(hdf_path, "r") as f:
+        imgs = f["rawimg"]
+        ut = f["ut1_unix"][:]
+        n_frames, height, width = imgs.shape
+
+        if start_time is None:
+            start_time = datetime.datetime.fromtimestamp(ut[0], datetime.timezone.utc)
+        if end_time is None:
+            end_time = datetime.datetime.fromtimestamp(ut[-1], datetime.timezone.utc)
+
+        playback_speed, fps, bin_size = assert_video_parameters(playback_speed, fps, bin_size, ut)
+
+        sub_idx = get_hourly_sub_idx(ut, start_time, end_time)
+
+        fns = [  # Produce file names for each video. ex. 2013-03-30_8-30-00_9-30-00.mp4
+            (
+                out_dir
+                / (
+                    hdf_path.stem
+                    + f'_{datetime.datetime.fromtimestamp(ut[s], datetime.timezone.utc).strftime("%H-%M-%S")}_{datetime.datetime.fromtimestamp(ut[e], datetime.timezone.utc).strftime("%H-%M-%S")}'
+                )
+            )
+            for s, e in pairwise(sub_idx)
+        ]
+
+        # try getting one norm for entire video
+        if norm is None:
+            start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
+            norm = compute_norm(
+                imgs,
+                ut,
+                1,
+                start_idx=start_idx,
+                end_idx=end_idx,
+                low_percentile=0.1,
+                high_percentile=99.9,
+            )  # TODO try diffferent perecentiles
+        frame_to_rgb = get_frame_to_rgb(cmap, norm)
+
+        for (sub_start_idx, sub_end_idx), fn in tqdm(list(zip(pairwise(sub_idx), fns)), desc="videos", unit="video"):
+            video_fn = fn.with_suffix(".mp4")
+            keogram_fn = fn.with_suffix(".png")
+            with imageio.get_writer(
+                video_fn, format="FFMPEG", fps=fps, codec="libx264", quality=video_quality
+            ) as writer:
+                video = VideoConsumer(
+                    writer, font, frame_to_rgb, height, width, imgs.dtype, ut.dtype, bin_size=bin_size
+                )
+                n_bins, frames_per_bin = compute_keogram_bins(n_frames=sub_end_idx - sub_start_idx + 1, ut=ut)
+                keogram = KeogramConsumer(
+                    height,
+                    width,
+                    n_bins=n_bins,
+                    frames_per_bin=frames_per_bin,
+                    cmap=cmap,
+                    norm=norm,
+                    outfn=keogram_fn,
+                    ut=ut,
+                )
+
+                frame_range = range(sub_start_idx, sub_end_idx + 1)
+                for n in tqdm(frame_range, desc=fn.name, unit="frame", leave=False):
+                    frame, frame_time = imgs[n], ut[n]
+                    video.update(n, frame, frame_time)
+                    keogram.update(n, frame, frame_time)
+                video.finalize()
+                keogram.finalize()
+
+        return norm
+
+
 def make_keogram_6_22_26(*, hdf_path, out_dir, bin_width_seconds=None, norm=None):
     from .consumers import KeogramConsumer
 
