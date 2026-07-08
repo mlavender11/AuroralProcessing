@@ -43,6 +43,42 @@ def compute_norm(
     high_percentile=99,
     chunk_size=50,
 ):
+    """
+    Generates a matplotlib LogNorm based on inputted array of frames
+    Samples at even intervals based on sample_interval_seconds
+
+    Parameters
+    ----------
+    imgs : _type_
+        array of frames, each pixel must be a 16-bit integer
+    ut_time : _type_
+        unix epoch time, corresponding to each frame
+    sample_interval_seconds : _type_
+        how often to sample a frame
+    start_idx : int, optional
+        start index for sample, by default 0
+    end_idx : _type_, optional
+        end index for sample, defaults to end imgs/ut_time
+    low_percentile : int, optional
+        vmin percentile value for LogNorm, by default 1
+    high_percentile : int, optional
+        vmax percentile value for LogNorm, by default 99
+    chunk_size : int, optional
+        splits calculations into chunks to save memory, by default 50
+
+    Returns
+    -------
+    matplotlib.colors.LogNorm
+        normalization function
+
+    Raises
+    ------
+    ValueError
+        if data isn't stored as 16-bit integers
+    ValueError
+        if no nonzero pixels are found in sampled frame
+    """
+
     if end_idx is None:
         end_idx = imgs.shape[0] - 1
 
@@ -88,6 +124,7 @@ def get_frame_to_rgb(cmap, norm):
     cmap : matplotlib color map
     norm : normalization function
     """
+
     def frame_to_rgb(raw_frame):
         rgba = cmap(norm(raw_frame))
         rgb = rgba[:, :, :3]
@@ -96,6 +133,7 @@ def get_frame_to_rgb(cmap, norm):
     return frame_to_rgb
 
 
+# TODO comment
 def get_font(size=16):
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", size)
@@ -105,7 +143,23 @@ def get_font(size=16):
     return font
 
 
+# TODO finnish doc
 def find_closest_item(arr, key):
+    """
+    finds the index of the element in arr that is closest to key
+
+    Parameters
+    ----------
+    arr : _type_
+        list to be searched
+    key : _type_
+        value to find closest elemnt to
+
+    Returns
+    -------
+    int
+        index of element in arr that is closest to key
+    """
     idx = np.searchsorted(arr, key)
     if idx == 0:
         return idx
@@ -116,7 +170,23 @@ def find_closest_item(arr, key):
     return left if abs(arr[left] - key) <= abs(arr[right] - key) else right
 
 
+# TODO finish doc
 def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
+    """
+    given a start time, end time, and unix epoch time list, returns index of start and end time
+
+    Parameters
+    ----------
+    start_time : datetime
+    end_time : datetime
+    unix_list : _type_
+        list of unix epoch time values
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     _assert_utc(start_time)
     _assert_utc(end_time)
 
@@ -130,25 +200,102 @@ def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
 
 
 def _assert_utc(dt: datetime.datetime) -> None:
+    """
+    asserts that datetime object is in UTC
+
+    Parameters
+    ----------
+    dt : datetime.datetime
+        datetime object to be checked
+
+    Raises
+    ------
+    ValueError
+        raises if dt is not in UTC
+    """
     if dt.tzinfo is None or dt.utcoffset() != datetime.timedelta(0):
         raise ValueError(f"datetime must be timezone-aware and in UTC, got: {dt!r}")
 
 
 def calculate_fps(ut, bin_size, playback_speed):
+    """
+    calculates the fps of output video based on bin size and playback speed
+
+    Parameters
+    ----------
+    ut : _type_
+        list of unix epoch time, corresponding to each frame
+    bin_size : int
+        number of source frames in each bin, to be averaged together into one output frame
+    playback_speed : _type_
+        playback speed multiplier
+
+    Returns
+    -------
+    _type_
+        output frames per second
+    """
     source_seconds_per_frame = np.median(np.diff(ut))
-    source_seconds_per_output_frame = source_seconds_per_frame * bin_size
-    fps = playback_speed / source_seconds_per_output_frame
+    source_seconds_per_output_bin = source_seconds_per_frame * bin_size
+    fps = playback_speed / source_seconds_per_output_bin
 
     return fps
 
 
 def calculate_bin_size(ut, fps, playback_speed):
+    """
+    calculates the frame bin size required for specified output fps and playback speed
+    bins are collections of source frames to be averaged into one output frame
+
+    Parameters
+    ----------
+    ut : _type_
+        list of unix epoch time, corresponding to each frame
+    fps : _type_
+        output frames per second
+    playback_speed : _type_
+        playback speed multiplier
+
+    Returns
+    -------
+    _type_
+        frames per bin. minimum of one
+    """
+
     source_seconds_per_frame = np.median(np.diff(ut))
     bin_size = playback_speed / (fps * source_seconds_per_frame)
     return max(1, round(bin_size))
 
 
 def assert_video_parameters(playback_speed, fps, bin_size, ut):
+    """
+    Asserts that exactly two out of playback speed, fps, and bin size are entered
+    computes the third value and returns all three
+
+    Parameters
+    ----------
+    playback_speed : _type_
+        playback speed multiplier
+    fps : _type_
+        output frames per second
+    bin_size : _type_
+        number of source frames in each bin, to be averaged together into one output frame
+    ut : _type_
+        list of unix epoch time, corresponding to each frame
+
+    Returns
+    -------
+    tuple
+        playback_speed, fps, bin_size
+
+    Raises
+    ------
+    ValueError
+        Less than two parameters given
+    ValueError
+        Three parameters given
+    """
+
     total_given = sum(x is not None for x in [playback_speed, fps, bin_size])
     if total_given < 2:
         raise ValueError(
@@ -170,6 +317,19 @@ def assert_video_parameters(playback_speed, fps, bin_size, ut):
 
 
 def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.datetime):
+    """
+    given a start and end time, return a list containing the start time, the top of every hour until the end time, and the end time
+
+    Parameters
+    ----------
+    start_time : datetime.datetime
+    end_time : datetime.datetime
+
+    Returns
+    -------
+    _type_
+        list containing start time, end time, and the top of every hour in between
+    """
     if start_time.minute > 0 or start_time.second > 0:
         first_whole_hour = start_time.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
         hours = [start_time]
@@ -189,6 +349,22 @@ def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.date
 
 
 def get_hourly_sub_idx(ut, start_time: datetime.datetime, end_time: datetime.datetime):
+    """
+    given a start, end time and list of unix epoch times, return a list containing the indecies of the start time, the top of every hour until the end time, and the end time
+
+    Parameters
+    ----------
+    ut : _type_
+        list of unix epoch times
+    start_time : datetime.datetime
+    end_time : datetime.datetime
+
+    Returns
+    -------
+    _type_
+        list containing the indicies of start time, end time, and the top of every hour in between in the ut list
+    """
+
     _assert_utc(start_time)
     _assert_utc(end_time)
 
@@ -460,6 +636,24 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
 
 
 def compute_keogram_bins(n_frames, ut, bin_width_seconds=None):
+    """
+    given the number of frames to be processed, a list of unix epoch times of each frame, and the width, in seconds, of each bin, return the number of bins and the frames in each bin
+    if bin_width_seconds is none, assumes 1 frame per bin
+
+    Parameters
+    ----------
+    n_frames : int
+        number of frames to be processed
+    ut : _type_
+        list of unix epoch times
+    bin_width_seconds : _type_, optional
+        number of seconds to be averaged together in each bin, by default None
+
+    Returns
+    -------
+    tuple
+        number of bins, frames per each bin
+    """
     import math
 
     if bin_width_seconds is None:
