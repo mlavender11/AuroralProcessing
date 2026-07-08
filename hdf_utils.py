@@ -80,6 +80,14 @@ def compute_norm(
 
 
 def get_frame_to_rgb(cmap, norm):
+    """
+    Generate a frame to rgb function based on chosen color map and normalization
+
+    Parameters
+    ----------
+    cmap : matplotlib color map
+    norm : normalization function
+    """
     def frame_to_rgb(raw_frame):
         rgba = cmap(norm(raw_frame))
         rgb = rgba[:, :, :3]
@@ -323,22 +331,16 @@ def make_hourly_videos_keograms(
         if output_hz is not None:
             native_dt = float(np.median(np.diff(ut)))
             stride = max(1, round((1 / output_hz) / native_dt))
-            bin_size = 1  # override bin size to 1
+            fps = output_hz * playback_speed
         else:
             stride = 1
 
-        sub_idx = get_hourly_sub_idx(ut, start_time, end_time)
+        if bin_size > stride:
+            raise ValueError(f"bin size {bin_size} must be smaller than stride {stride}")
 
-        fns = [  # Produce file names for each video. ex. 2013-03-30_8-30-00_9-30-00.mp4
-            (
-                out_dir
-                / (
-                    hdf_path.stem
-                    + f'_{datetime.datetime.fromtimestamp(ut[s], datetime.timezone.utc).strftime("%H-%M-%S")}_{datetime.datetime.fromtimestamp(ut[e], datetime.timezone.utc).strftime("%H-%M-%S")}'
-                )
-            )
-            for s, e in pairwise(sub_idx)
-        ]
+        # TODO add bin size int verification - must be int
+
+        sub_idx = get_hourly_sub_idx(ut, start_time, end_time)
 
         # try getting one norm for entire video
         if norm is None:
@@ -352,9 +354,14 @@ def make_hourly_videos_keograms(
                 low_percentile=0.1,
                 high_percentile=99.9,
             )  # TODO try diffferent perecentiles
+
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
-        for (sub_start_idx, sub_end_idx), fn in tqdm(list(zip(pairwise(sub_idx), fns)), desc="videos", unit="video"):
+        def time_to_string(t):
+            return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%H-%M-%S")
+
+        for sub_start_idx, sub_end_idx in tqdm(list(pairwise(sub_idx)), desc="videos", unit="video"):
+            fn = out_dir / f"{hdf_path.stem}_{time_to_string(ut[sub_start_idx])}_{(time_to_string(ut[sub_end_idx]))}"
             video_fn = fn.with_suffix(".mp4")
             keogram_fn = fn.with_suffix(".png")
             with imageio.get_writer(
@@ -377,9 +384,12 @@ def make_hourly_videos_keograms(
 
                 frame_range = range(sub_start_idx, sub_end_idx)
                 for n in tqdm(frame_range, desc=fn.name, unit="frame", leave=False):
+
                     frame, frame_time = imgs[n], ut[n]
-                    if (n - sub_start_idx) % stride == 0:
+
+                    if (n - sub_start_idx) % stride < bin_size:
                         video.update(n, frame, frame_time)
+
                     keogram.update(n, frame, frame_time)
                 video.finalize()
                 keogram.finalize()

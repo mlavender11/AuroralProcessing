@@ -19,7 +19,19 @@ def compute_keogram_bins(n_frames, ut):
     return n_bins, frames_per_bin
 
 
-def save_keogram_NS_and_EW(*, keogram_NS, keogram_EW, ut_hours, frame_height, frame_width, outfn, cmap, norm, date_str, tick_interval_hours=1/6):
+def save_keogram_NS_and_EW(
+    *,
+    keogram_NS,
+    keogram_EW,
+    ut_hours,
+    frame_height,
+    frame_width,
+    outfn,
+    cmap,
+    norm,
+    date_str,
+    tick_interval_hours=1 / 6,
+):
     import math
 
     fig, (axNS, axEW) = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
@@ -45,7 +57,7 @@ def save_keogram_NS_and_EW(*, keogram_NS, keogram_EW, ut_hours, frame_height, fr
     )
     axEW.set_ylabel("X Pixel Index")
     axEW.set_title("East-West Keogram")
-    axEW.set_xlabel("UT Hours")
+    axEW.set_xlabel("UTC Time")
 
     # ticks every ten min
     start, end = ut_hours[0], ut_hours[-1]
