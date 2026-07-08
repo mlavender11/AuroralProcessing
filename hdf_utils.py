@@ -49,22 +49,22 @@ def compute_norm(
 
     Parameters
     ----------
-    imgs : _type_
-        array of frames, each pixel must be a 16-bit integer
-    ut_time : _type_
-        unix epoch time, corresponding to each frame
-    sample_interval_seconds : _type_
-        how often to sample a frame
+    imgs : np.ndarray or h5py.Dataset
+        Array of frames, shape (n_frames, height, width). Each pixel must be a 16-bit unsigned integer.
+    ut_time : np.ndarray or h5py.Dataset
+        Unix epoch time, corresponding to each frame in imgs.
+    sample_interval_seconds : float
+        How often, in seconds, to sample a frame.
     start_idx : int, optional
-        start index for sample, by default 0
+        Start index for sample, by default 0.
     end_idx : _type_, optional
-        end index for sample, defaults to end imgs/ut_time
+        End index for sample, defaults to the last index of imgs/ut_time
     low_percentile : int, optional
         vmin percentile value for LogNorm, by default 1
     high_percentile : int, optional
         vmax percentile value for LogNorm, by default 99
     chunk_size : int, optional
-        splits calculations into chunks to save memory, by default 50
+        Splits calculations into chunks to save memory, by default 50
 
     Returns
     -------
@@ -74,9 +74,9 @@ def compute_norm(
     Raises
     ------
     ValueError
-        if data isn't stored as 16-bit integers
+        If data isn't stored as 16-bit unsigned integers
     ValueError
-        if no nonzero pixels are found in sampled frame
+        If no nonzero pixels are found in the sampled frames
     """
 
     if end_idx is None:
@@ -150,22 +150,21 @@ def get_font(size=16):
     return font
 
 
-# TODO finnish doc
 def find_closest_item(arr, key):
     """
-    finds the index of the element in arr that is closest to key
+    Finds the index of the element in arr that is closest in value to key
 
     Parameters
     ----------
-    arr : _type_
-        list to be searched
-    key : _type_
-        value to find closest elemnt to
+    arr : array_like
+        Sorted (ascending) 1D array to be searched
+    key : float
+        Value to find closest element to.
 
     Returns
     -------
     int
-        index of element in arr that is closest to key
+        Index of element in arr that is closest to key.
     """
     idx = np.searchsorted(arr, key)
     if idx == 0:
@@ -177,23 +176,26 @@ def find_closest_item(arr, key):
     return left if abs(arr[left] - key) <= abs(arr[right] - key) else right
 
 
-# TODO finish doc
 def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
     """
-    given a start time, end time, and unix epoch time list, returns index of start and end time
+    Given a start time, end time, and unix epoch time list, returns index of the start and end time
 
     Parameters
     ----------
-    start_time : datetime
-    end_time : datetime
-    unix_list : _type_
-        list of unix epoch time values
+    start_time : datetime.datetime
+        UTC start time to locate in unix_list
+    end_time : datetime.datetime
+        UTC end time to locate in unix_list
+    unix_list : array_like
+        Sorted (ascending) list of unix epoch time values.
 
     Returns
     -------
-    _type_
-        _description_
+    tuple[int, int]
+        Index of the frame closest to start_time and index of the frame
+        closest to end_time.
     """
+
     _assert_utc(start_time)
     _assert_utc(end_time)
 
@@ -208,17 +210,17 @@ def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
 
 def _assert_utc(dt: datetime.datetime) -> None:
     """
-    asserts that datetime object is in UTC
+    Asserts that a datetime object is in UTC.
 
     Parameters
     ----------
     dt : datetime.datetime
-        datetime object to be checked
+        Datetime object to be checked.
 
     Raises
     ------
     ValueError
-        raises if dt is not in UTC
+        Raises if dt is not timezone-aware and in UTC.
     """
     if dt.tzinfo is None or dt.utcoffset() != datetime.timedelta(0):
         raise ValueError(f"datetime must be timezone-aware and in UTC, got: {dt!r}")
@@ -226,21 +228,21 @@ def _assert_utc(dt: datetime.datetime) -> None:
 
 def calculate_fps(ut, bin_size, playback_speed):
     """
-    calculates the fps of output video based on bin size and playback speed
+    Calculates the fps of output video based on bin size and playback speed.
 
     Parameters
     ----------
-    ut : _type_
-        list of unix epoch time, corresponding to each frame
+    ut : array_like
+        List of unix epoch time, corresponding to each frame
     bin_size : int
-        number of source frames in each bin, to be averaged together into one output frame
-    playback_speed : _type_
-        playback speed multiplier
+        Number of source frames in each bin, to be averaged together into one output frame.
+    playback_speed : float
+        Playback speed multiplier.
 
     Returns
     -------
-    _type_
-        output frames per second
+    float
+        Output frames per second.
     """
     source_seconds_per_frame = np.median(np.diff(ut))
     source_seconds_per_output_bin = source_seconds_per_frame * bin_size
@@ -251,22 +253,22 @@ def calculate_fps(ut, bin_size, playback_speed):
 
 def calculate_bin_size(ut, fps, playback_speed):
     """
-    calculates the frame bin size required for specified output fps and playback speed
-    bins are collections of source frames to be averaged into one output frame
+    Calculates the frame bin size required for specified output fps and playback speed
+    bins are collections of source frames to be averaged into one output frame.
 
     Parameters
     ----------
-    ut : _type_
-        list of unix epoch time, corresponding to each frame
-    fps : _type_
-        output frames per second
-    playback_speed : _type_
-        playback speed multiplier
+    ut : array_like
+        List of unix epoch time, corresponding to each frame.
+    fps : float
+        Output frames per second.
+    playback_speed : float
+        Playback speed multiplier.
 
     Returns
     -------
-    _type_
-        frames per bin. minimum of one
+    int
+        Frames per bin. Minimum of one.
     """
 
     source_seconds_per_frame = np.median(np.diff(ut))
@@ -276,31 +278,31 @@ def calculate_bin_size(ut, fps, playback_speed):
 
 def assert_video_parameters(playback_speed, fps, bin_size, ut):
     """
-    Asserts that exactly two out of playback speed, fps, and bin size are entered
-    computes the third value and returns all three
+    Asserts that exactly two out of playback speed, fps, and bin size are entered,
+    computes the third value, and returns all three.
 
     Parameters
     ----------
-    playback_speed : _type_
-        playback speed multiplier
-    fps : _type_
-        output frames per second
-    bin_size : _type_
-        number of source frames in each bin, to be averaged together into one output frame
-    ut : _type_
-        list of unix epoch time, corresponding to each frame
+    playback_speed : floar or None
+        Playback speed multiplier.
+    fps : float or None
+        Output frames per second.
+    bin_size : int or None
+        Number of source frames in each bin, to be averaged together into one output frame.
+    ut : array_like
+        List of unix epoch time, corresponding to each frame.
 
     Returns
     -------
-    tuple
+    tuple[float, float, int]
         playback_speed, fps, bin_size
 
     Raises
     ------
     ValueError
-        Less than two parameters given
+        Less than two parameters given.
     ValueError
-        Three parameters given
+        Three parameters given.
     """
 
     total_given = sum(x is not None for x in [playback_speed, fps, bin_size])
@@ -325,7 +327,7 @@ def assert_video_parameters(playback_speed, fps, bin_size, ut):
 
 def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.datetime):
     """
-    given a start and end time, return a list containing the start time, the top of every hour until the end time, and the end time
+    Given a start and end time, return a list containing the start time, the top of every hour until the end time, and the end time.
 
     Parameters
     ----------
@@ -334,9 +336,11 @@ def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.date
 
     Returns
     -------
-    _type_
-        list containing start time, end time, and the top of every hour in between
+    list[datetime.datetime]
+        List containing start time, end time, and the top of every hour in
+        between, in ascending order.
     """
+
     if start_time.minute > 0 or start_time.second > 0:
         first_whole_hour = start_time.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
         hours = [start_time]
@@ -357,19 +361,22 @@ def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.date
 
 def get_hourly_sub_idx(ut, start_time: datetime.datetime, end_time: datetime.datetime):
     """
-    given a start, end time and list of unix epoch times, return a list containing the indecies of the start time, the top of every hour until the end time, and the end time
+    Given a start time, end time, and list of unix epoch times, return a list
+    containing the indices of the start time, the top of every hour until the
+    end time, and the end time.
 
     Parameters
     ----------
-    ut : _type_
-        list of unix epoch times
+    ut : array_like
+        List of unix epoch times.
     start_time : datetime.datetime
     end_time : datetime.datetime
 
     Returns
     -------
-    _type_
-        list containing the indicies of start time, end time, and the top of every hour in between in the ut list
+    list[int]
+        List containing the indices, in the ut list, of the start time, end
+        time, and every hour boundary in between.
     """
 
     _assert_utc(start_time)
@@ -557,7 +564,6 @@ def make_hourly_videos_keograms(
 
         sub_idx = get_hourly_sub_idx(ut, start_time, end_time)
 
-        # try getting one norm for entire video
         if norm is None:
             start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
             norm = compute_norm(
@@ -594,7 +600,7 @@ def make_hourly_videos_keograms(
                 )
 
                 frame_range = range(sub_start_idx, sub_end_idx)
-                for n in tqdm(frame_range, desc=fn.name, unit="frame", leave=False):
+                for n in tqdm(frame_range, desc=video_fn.stem, unit="frame", leave=False):
 
                     frame, frame_time = imgs[n], ut[n]
 
@@ -672,23 +678,26 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
 
 def compute_keogram_bins(n_frames, ut, bin_width_seconds=None):
     """
-    given the number of frames to be processed, a list of unix epoch times of each frame, and the width, in seconds, of each bin, return the number of bins and the frames in each bin
-    if bin_width_seconds is none, assumes 1 frame per bin
+    Given the number of frames to be processed, a list of unix epoch times of
+    each frame, and the width, in seconds, of each bin, return the number of
+    bins and the frames in each bin. If bin_width_seconds is None, assumes 1
+    frame per bin.
 
     Parameters
     ----------
     n_frames : int
-        number of frames to be processed
-    ut : _type_
-        list of unix epoch times
-    bin_width_seconds : _type_, optional
-        number of seconds to be averaged together in each bin, by default None
+        Number of frames to be processed.
+    ut : array_like
+        List of unix epoch times.
+    bin_width_seconds : float, optional
+        Number of seconds to be averaged together in each bin, by default None.
 
     Returns
     -------
-    tuple
-        number of bins, frames per each bin
+    tuple[int, int]
+        n_bins, frames_per_bin
     """
+
     import math
 
     if bin_width_seconds is None:

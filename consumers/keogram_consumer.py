@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 
 
 def compute_keogram_bins(n_frames, ut):
-    print(f"binwidthseconds = {BIN_WIDTH_SECONDS}")  # TODO remove
     if BIN_WIDTH_SECONDS is None:
         return n_frames, 1
     num_seconds = ut[-1] - ut[0]
