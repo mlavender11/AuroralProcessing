@@ -468,6 +468,24 @@ def make_video_from_times(
 
 
 def build_output_paths(hdf_path: Path, out_dir: Path, unix_time):
+    """
+    build output paths like CamSer1387_20130414_07.png
+
+    Parameters
+    ----------
+    hdf_path : Path
+        hdf file path
+    out_dir : Path
+        output director
+    unix_time : _type_
+        time at beginning of video/keogram subset
+
+    Returns
+    -------
+    _type_
+        video path (stem.mp4), keogram path (stem.png)
+    """
+
     import re
 
     cam_str = re.search(r"CamSer\d+", hdf_path.stem).group()
