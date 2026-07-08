@@ -117,12 +117,19 @@ def compute_norm(
 
 def get_frame_to_rgb(cmap, norm):
     """
-    Generate a frame to rgb function based on chosen color map and normalization
+    Build a function that converts a raw frame to an RGB uint8 image.
 
     Parameters
     ----------
-    cmap : matplotlib color map
-    norm : normalization function
+    cmap : matplotlib.colors.Colormap
+        Color map applied to normalized pixel values.
+    norm : matplotlib.colors.Normalize
+        Normalization applied to raw pixel values before colormapping.
+
+    Returns
+    -------
+    Callable[[np.ndarray], np.ndarray]
+        Function that maps a raw frame array to an (H, W, 3) uint8 RGB array.
     """
 
     def frame_to_rgb(raw_frame):
@@ -460,6 +467,20 @@ def make_video_from_times(
         return norm
 
 
+def build_output_paths(hdf_path: Path, out_dir: Path, unix_time):
+    import re
+
+    cam_str = re.search(r"CamSer\d+", hdf_path.stem).group()
+
+    dt = datetime.datetime.fromtimestamp(unix_time, tz=datetime.timezone.utc)
+    date_str = dt.strftime("%Y%m%d")
+    hour_str = dt.strftime("%H")
+
+    fn = out_dir / f"{cam_str}_{date_str}_{hour_str}"
+
+    return fn.with_suffix(".mp4"), fn.with_suffix(".mp4")
+
+
 def make_hourly_videos_keograms(
     *,
     hdf_path,
@@ -533,13 +554,9 @@ def make_hourly_videos_keograms(
 
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
-        def time_to_string(t):
-            return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%H-%M-%S")
-
         for sub_start_idx, sub_end_idx in tqdm(list(pairwise(sub_idx)), desc="videos", unit="video"):
-            fn = out_dir / f"{hdf_path.stem}_{time_to_string(ut[sub_start_idx])}_{(time_to_string(ut[sub_end_idx]))}"
-            video_fn = fn.with_suffix(".mp4")
-            keogram_fn = fn.with_suffix(".png")
+            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx])
+
             with imageio.get_writer(
                 video_fn, format="FFMPEG", fps=fps, codec="libx264", quality=video_quality
             ) as writer:
