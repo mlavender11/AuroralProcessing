@@ -1,6 +1,5 @@
 import numpy as np
-from .. import hdf_utils
-from ..config import BIN_WIDTH_SECONDS
+import hdf_utils
 import math
 import datetime
 from zoneinfo import ZoneInfo
