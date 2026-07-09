@@ -7,7 +7,7 @@ from pathlib import Path
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, Normalize
 from PIL import ImageFont
 from tqdm.auto import tqdm
 
@@ -42,6 +42,7 @@ def compute_norm(
     low_percentile=1,
     high_percentile=99,
     chunk_size=50,
+    linear=False,  # add to docstring
 ):
     """
     Generates a matplotlib LogNorm based on inputted array of frames
@@ -109,10 +110,14 @@ def compute_norm(
         target = total * p / 100
         return np.searchsorted(cdf, target)
 
-    vmin = max(value_at_percentile(low_percentile), 1e-6)
-    vmax = value_at_percentile(high_percentile)
-
-    return LogNorm(vmin=vmin, vmax=vmax)
+    if linear:
+        vmin = value_at_percentile(low_percentile)
+        vmax = value_at_percentile(high_percentile)
+        return Normalize(vmin=vmin, vmax=vmax)
+    else:
+        vmin = max(value_at_percentile(low_percentile), 1e-6)
+        vmax = value_at_percentile(high_percentile)
+        return LogNorm(vmin=vmin, vmax=vmax)
 
 
 def get_frame_to_rgb(cmap, norm):
@@ -402,6 +407,45 @@ def make_video_from_times(
     norm=None,
     make_keogram=False,  # TODO make hourly keograms
 ):
+    """
+    Render one MP4 video per hour-aligned segment from an HDF5 raw-frame file.
+
+    Parameters
+    ----------
+    hdf_path : str or pathlib.Path
+        Path to the source HDF5 file, containing "rawimg" and "ut1_unix"
+        datasets.
+    out_dir : str or pathlib.Path
+        Directory to write output videos to; created if it doesn't exist.
+    start_time : datetime.datetime, optional
+        UTC start of the range to render. Defaults to the first frame's
+        timestamp.
+    end_time : datetime.datetime, optional
+        UTC end of the range to render. Defaults to the last frame's
+        timestamp.
+    bin_size : int, optional
+        Number of source frames averaged into each output frame. Exactly two
+        of bin_size, fps, and playback_speed must be provided; see
+        assert_video_parameters.
+    video_quality : int, optional
+        FFMPEG quality setting passed to imageio, by default 6.
+    playback_speed : float, optional
+        Playback speed multiplier. See assert_video_parameters.
+    fps : float, optional
+        Output frames per second. See assert_video_parameters.
+    norm : matplotlib.colors.LogNorm, optional
+        Normalization to apply to pixel values. Computed automatically from a
+        sample of the frame range if not given.
+    make_keogram : bool, optional
+        Currently unused. By default False.
+
+    Returns
+    -------
+    matplotlib.colors.LogNorm
+        The normalization used (either the one passed in or the one
+        computed).
+    """
+
     from itertools import pairwise
     from pathlib import Path
     import imageio
@@ -506,7 +550,7 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time):
     return fn.with_suffix(".mp4"), fn.with_suffix(".mp4")
 
 
-def make_hourly_videos_keograms(
+def make_hourly_videos_keograms(  # TODO check these docstrings
     *,
     hdf_path,
     out_dir,
@@ -519,6 +563,53 @@ def make_hourly_videos_keograms(
     norm=None,
     output_hz=None,
 ):
+    """
+    Render one MP4 video and one keogram PNG per hour-aligned segment, with
+    optional temporal downsampling of the video.
+
+    Parameters
+    ----------
+    hdf_path : str or pathlib.Path
+        Path to the source HDF5 file, containing "rawimg" and "ut1_unix"
+        datasets.
+    out_dir : str or pathlib.Path
+        Directory to write output videos and keograms to; created if it
+        doesn't exist.
+    start_time : datetime.datetime, optional
+        UTC start of the range to render. Defaults to the first frame's
+        timestamp.
+    end_time : datetime.datetime, optional
+        UTC end of the range to render. Defaults to the last frame's
+        timestamp.
+    bin_size : int, optional
+        Number of source frames averaged into each output video frame. Must
+        be smaller than the downsampling stride. See assert_video_parameters.
+    video_quality : int, optional
+        FFMPEG quality setting passed to imageio, by default 6.
+    playback_speed : float, optional
+        Playback speed multiplier. See assert_video_parameters.
+    fps : float, optional
+        Output frames per second. See assert_video_parameters.
+    norm : matplotlib.colors.LogNorm, optional
+        Normalization to apply to pixel values. Computed automatically from a
+        sample of the frame range if not given.
+    output_hz : float, optional
+        If given, the video is downsampled so only 1 in every N source
+        frames is written, where N is chosen to hit this output rate.
+        Keograms still include every frame regardless of this setting.
+
+    Returns
+    -------
+    matplotlib.colors.LogNorm
+        The normalization used (either the one passed in or the one
+        computed).
+
+    Raises
+    ------
+    ValueError
+        If bin_size is not smaller than the computed downsampling stride.
+    """
+
     from itertools import pairwise
     from pathlib import Path
     import imageio
@@ -615,6 +706,25 @@ def make_hourly_videos_keograms(
 
 
 def make_keogram_6_22_26(*, hdf_path, out_dir, bin_width_seconds=None, norm=None):
+    """
+    Render a single keogram PNG for an entire HDF5 raw-frame file.
+
+    Parameters
+    ----------
+    hdf_path : str or pathlib.Path
+        Path to the source HDF5 file, containing "rawimg" and "ut1_unix"
+        datasets.
+    out_dir : str or pathlib.Path
+        Directory to write the keogram to; created if it doesn't exist. The
+        output filename matches hdf_path's stem with a .png suffix.
+    bin_width_seconds : float, optional
+        Width, in seconds, of each keogram column. Defaults to 1 frame per
+        bin.
+    norm : matplotlib.colors.LogNorm, optional
+        Normalization to apply to pixel values. Computed automatically over
+        the whole file if not given.
+    """
+
     from .consumers import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
@@ -642,6 +752,31 @@ def make_keogram_6_22_26(*, hdf_path, out_dir, bin_width_seconds=None, norm=None
 
 
 def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval):
+    """
+    Render a keogram PNG using a coarser, faster sampling strategy that only
+    reads a subset of frames instead of the full file.
+
+    Parameters
+    ----------
+    hdf_path : str or pathlib.Path
+        Path to the source HDF5 file, containing "rawimg" and "ut1_unix"
+        datasets.
+    out_dir : str or pathlib.Path
+        Directory to write the keogram to; created if it doesn't exist. The
+        output filename matches hdf_path's stem with a .png suffix.
+    bin_size_seconds : float
+        Width, in seconds, of each keogram column.
+    sample_interval : int
+        Number of source frames to skip between each sampled block. Must be
+        larger than the number of frames per keogram bin.
+
+    Raises
+    ------
+    ValueError
+        If frames_per_bin computed from bin_size_seconds is not smaller than
+        sample_interval.
+    """
+
     from .consumers import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
