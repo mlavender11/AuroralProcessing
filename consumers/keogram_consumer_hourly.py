@@ -86,7 +86,7 @@ def save_keogram_NS_and_EW(
     plt.close(fig)
 
 
-class KeogramConsumer:  # TODO add type verification for ut
+class HourlyKeogramConsumer:  # TODO add type verification for ut
     def __init__(
         self,
         *,

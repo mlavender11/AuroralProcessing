@@ -8,14 +8,14 @@ from matplotlib.ticker import FixedLocator, FuncFormatter
 import matplotlib.pyplot as plt
 
 
-def compute_keogram_bins(n_frames, ut):
-    if BIN_WIDTH_SECONDS is None:
-        return n_frames, 1
-    num_seconds = ut[-1] - ut[0]
-    n_bins = max(1, int(num_seconds / BIN_WIDTH_SECONDS))
-    frames_per_bin = max(1, n_frames // n_bins)
-    n_bins = math.ceil(n_frames / frames_per_bin)  # actual columns
-    return n_bins, frames_per_bin
+# def compute_keogram_bins(n_frames, ut):
+#     if BIN_WIDTH_SECONDS is None:
+#         return n_frames, 1
+#     num_seconds = ut[-1] - ut[0]
+#     n_bins = max(1, int(num_seconds / BIN_WIDTH_SECONDS))
+#     frames_per_bin = max(1, n_frames // n_bins)
+#     n_bins = math.ceil(n_frames / frames_per_bin)  # actual columns
+#     return n_bins, frames_per_bin
 
 
 def save_keogram_NS_and_EW(

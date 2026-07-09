@@ -518,7 +518,7 @@ def make_video_from_times(
         return norm
 
 
-def build_output_paths(hdf_path: Path, out_dir: Path, unix_time):
+def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int):
     """
     build output paths like CamSer1387_20130414_07.png
 
@@ -545,9 +545,10 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time):
     date_str = dt.strftime("%Y%m%d")
     hour_str = dt.strftime("%H")
 
-    fn = out_dir / f"{cam_str}_{date_str}_{hour_str}"
+    # fn = out_dir / f"{cam_str}_{date_str}_{hour_str}"
+    fn = out_dir / f"{cam_str}_{date_str}_{i}"
 
-    return fn.with_suffix(".mp4"), fn.with_suffix(".mp4")
+    return fn.with_suffix(".mp4"), fn.with_suffix(".png")
 
 
 def make_hourly_videos_keograms(  # TODO check these docstrings
@@ -613,7 +614,9 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     from itertools import pairwise
     from pathlib import Path
     import imageio
-    from .consumers import VideoConsumer, KeogramConsumer
+    from .consumers import VideoConsumer, HourlyKeogramConsumer
+
+    # from .consumers import VideoConsumer, KeogramConsumer, HourlyKeogramConsumer
 
     if start_time is not None:
         _assert_utc(start_time)
@@ -669,8 +672,8 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
 
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
-        for sub_start_idx, sub_end_idx in tqdm(list(pairwise(sub_idx)), desc="videos", unit="video"):
-            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx])
+        for i, (sub_start_idx, sub_end_idx) in tqdm(list(enumerate(pairwise(sub_idx))), desc="videos", unit="video"):
+            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx], i)
 
             with imageio.get_writer(
                 video_fn, format="FFMPEG", fps=fps, codec="libx264", quality=video_quality
@@ -679,15 +682,29 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
                     writer, font, frame_to_rgb, height, width, imgs.dtype, ut.dtype, bin_size=bin_size
                 )
                 n_bins, frames_per_bin = compute_keogram_bins(n_frames=sub_end_idx - sub_start_idx, ut=ut)
-                keogram = KeogramConsumer(
-                    height,
-                    width,
-                    n_bins=n_bins,
-                    frames_per_bin=frames_per_bin,
-                    cmap=cmap,
-                    norm=norm,
-                    outfn=keogram_fn,
-                    ut=ut[sub_start_idx:sub_end_idx],
+                # keogram = KeogramConsumer(
+                #     height,
+                #     width,
+                #     n_bins=n_bins,
+                #     frames_per_bin=frames_per_bin,
+                #     cmap=cmap,
+                #     norm=norm,
+                #     outfn=keogram_fn,
+                #     ut=ut[sub_start_idx:sub_end_idx],
+                # )
+
+                if sub_start_idx + 500 >= len(ut):
+                    start_hour_idx = len(ut) - 1
+                else:
+                    start_hour_idx = sub_start_idx + 500
+
+                hour_start_dt = datetime.datetime.fromtimestamp(ut[start_hour_idx], datetime.timezone.utc).replace(
+                    minute=0, second=0, microsecond=0
+                )
+                hour_start_ut = hour_start_dt.timestamp()
+
+                keogram = HourlyKeogramConsumer(
+                    height=height, width=width, cmap=cmap, norm=norm, outfn=keogram_fn, hour_start_ut=hour_start_ut
                 )
 
                 frame_range = range(sub_start_idx, sub_end_idx)
