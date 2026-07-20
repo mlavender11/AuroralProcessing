@@ -120,6 +120,50 @@ def compute_norm(
         return LogNorm(vmin=vmin, vmax=vmax)
 
 
+def compute_norm_from_hdf(
+    hdf_fn,
+    sample_interval_seconds,
+    start_time: datetime.datetime | None = None,
+    end_time: datetime.datetime | None = None,
+    *,
+    low_percentile=1,
+    high_percentile=99,
+    chunk_size=50,
+    linear=False,
+):
+    if start_time is not None:
+        _assert_utc(start_time)
+    if end_time is not None:
+        _assert_utc(end_time)
+
+    hdf_path = Path(hdf_fn)
+
+    with h5py.File(hdf_path, "r") as f:
+        imgs = f["rawimg"]
+        ut = f["ut1_unix"][:]
+
+        if start_time is None:
+            start_time = datetime.datetime.fromtimestamp(ut[0], datetime.timezone.utc)
+        if end_time is None:
+            end_time = datetime.datetime.fromtimestamp(ut[-1], datetime.timezone.utc)
+
+        start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
+
+        norm = compute_norm(
+            imgs,
+            ut,
+            sample_interval_seconds,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            low_percentile=low_percentile,
+            high_percentile=high_percentile,
+            chunk_size=chunk_size,
+            linear=linear,
+        )
+
+    return norm
+
+
 def get_frame_to_rgb(cmap, norm):
     """
     Build a function that converts a raw frame to an RGB uint8 image.
@@ -449,7 +493,7 @@ def make_video_from_times(
     from itertools import pairwise
     from pathlib import Path
     import imageio
-    from .consumers import VideoConsumer
+    from video_consumer import VideoConsumer
 
     if start_time is not None:
         _assert_utc(start_time)
@@ -614,7 +658,8 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     from itertools import pairwise
     from pathlib import Path
     import imageio
-    from .consumers import VideoConsumer, HourlyKeogramConsumer
+    from video_consumer import VideoConsumer
+    from keogram_consumer_hourly import HourlyKeogramConsumer
 
     # from .consumers import VideoConsumer, KeogramConsumer, HourlyKeogramConsumer
 
@@ -742,7 +787,7 @@ def make_keogram_6_22_26(*, hdf_path, out_dir, bin_width_seconds=None, norm=None
         the whole file if not given.
     """
 
-    from .consumers import KeogramConsumer
+    from keogram_consumer import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
     out_dir = Path(out_dir)
@@ -794,7 +839,7 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
         sample_interval.
     """
 
-    from .consumers import KeogramConsumer
+    from keogram_consumer import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
     out_dir = Path(out_dir)
@@ -859,3 +904,26 @@ def compute_keogram_bins(n_frames, ut, bin_width_seconds=None):
     frames_per_bin = max(1, n_frames // n_bins)
     n_bins = math.ceil(n_frames / frames_per_bin)  # actual columns
     return n_bins, frames_per_bin
+
+
+def parse_log_for_start_time(log_file: Path | str) -> datetime.datetime:
+    import re
+
+    log_file = Path(log_file)
+    if not log_file.is_file():
+        raise FileNotFoundError(log_file)
+
+    with log_file.open("r") as f:
+        for line in f:
+            if "Acquisition started" in line:
+                break
+        else:
+            raise ValueError(f"No 'Acquisition started' line found in {log_file}")
+
+    match = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)", line)
+    if match:
+        start_time = datetime.datetime.strptime(match.group(), "%Y-%m-%dT%H:%M:%S.%f")
+    else:
+        raise ValueError(f"no start time found in {line.strip()}")
+
+    return start_time
