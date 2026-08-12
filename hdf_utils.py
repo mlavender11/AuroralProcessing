@@ -369,7 +369,6 @@ def assert_video_parameters(playback_speed, fps, bin_size, ut):
             fps = calculate_fps(ut, bin_size, playback_speed)
         if bin_size is None:
             bin_size = calculate_bin_size(ut, fps, playback_speed)
-            bin_size = max(1, round(bin_size))
 
     return playback_speed, fps, bin_size
 
@@ -606,7 +605,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     playback_speed=None,
     fps=None,
     norm=None,
-    output_hz=None,
+    sample_rate_hz=None,
 ):
     """
     Render one MP4 video and one keogram PNG per hour-aligned segment, with
@@ -638,7 +637,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     norm : matplotlib.colors.LogNorm, optional
         Normalization to apply to pixel values. Computed automatically from a
         sample of the frame range if not given.
-    output_hz : float, optional
+    sample_rate_hz : float, optional
         If given, the video is downsampled so only 1 in every N source
         frames is written, where N is chosen to hit this output rate.
         Keograms still include every frame regardless of this setting.
@@ -660,8 +659,6 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     import imageio
     from video_consumer import VideoConsumer
     from keogram_consumer_hourly import HourlyKeogramConsumer
-
-    # from .consumers import VideoConsumer, KeogramConsumer, HourlyKeogramConsumer
 
     if start_time is not None:
         _assert_utc(start_time)
@@ -688,11 +685,11 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
         playback_speed, fps, bin_size = assert_video_parameters(playback_speed, fps, bin_size, ut)
 
         # downsampling calculations
-
-        if output_hz is not None:
+        if sample_rate_hz is not None:
             native_dt = float(np.median(np.diff(ut)))
-            stride = max(1, round((1 / output_hz) / native_dt))
-            fps = output_hz * playback_speed
+            native_fps = 1 / native_dt
+            stride = max(1, round(native_fps / sample_rate_hz))
+            fps = sample_rate_hz * playback_speed
         else:
             stride = 1
 
@@ -757,7 +754,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
 
                     frame, frame_time = imgs[n], ut[n]
 
-                    if (n - sub_start_idx) % stride < bin_size:
+                    if (n - sub_start_idx) % stride < bin_size:  # Selects the first bin_size frames in every stride
                         video.update(n, frame, frame_time)
 
                     keogram.update(n, frame, frame_time)

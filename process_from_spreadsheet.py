@@ -110,7 +110,9 @@ def process_sheet(sheet_fn, drive_path):
 
 def run_hdf(hdf_fn, sample_interval_seconds, start_time, out_dir):
     norm = compute_norm_from_hdf(hdf_fn=hdf_fn, sample_interval_seconds=sample_interval_seconds, start_time=start_time)
-    make_hourly_videos_keograms(hdf_path=hdf_fn, out_dir=out_dir, bin_size=5, playback_speed=15, output_hz=1, norm=norm)
+    make_hourly_videos_keograms(
+        hdf_path=hdf_fn, out_dir=out_dir, bin_size=5, playback_speed=15, sample_rate_hz=1, norm=norm
+    )
 
 
 if __name__ == "__main__":
