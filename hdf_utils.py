@@ -583,14 +583,17 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int):
 
     import re
 
-    cam_str = re.search(r"CamSer\d+", hdf_path.stem).group()
+    # cam_str = re.search(r"CamSer\d+", hdf_path.stem).group()
 
     dt = datetime.datetime.fromtimestamp(unix_time, tz=datetime.timezone.utc)
     date_str = dt.strftime("%Y%m%d")
     hour_str = dt.strftime("%H")
 
     # fn = out_dir / f"{cam_str}_{date_str}_{hour_str}"
-    fn = out_dir / f"{cam_str}_{date_str}_{i}"
+    # fn = out_dir / f"{cam_str}_{date_str}_{i}"
+    fn = out_dir / f'DMC_{date_str}_{hour_str}'
+  
+  
 
     return fn.with_suffix(".mp4"), fn.with_suffix(".png")
 
