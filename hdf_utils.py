@@ -590,9 +590,7 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int):
 
     # fn = out_dir / f"{cam_str}_{date_str}_{hour_str}"
     # fn = out_dir / f"{cam_str}_{date_str}_{i}"
-    fn = out_dir / f'DMC_{date_str}_{hour_str}'
-  
-  
+    fn = out_dir / f"DMC_{date_str}_{hour_str}"
 
     return fn.with_suffix(".mp4"), fn.with_suffix(".png")
 
@@ -609,6 +607,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     fps=None,
     norm=None,
     sample_rate_hz=None,
+    font_size=16
 ):
     """
     Render one MP4 video and one keogram PNG per hour-aligned segment, with
@@ -673,7 +672,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cmap = plt.get_cmap("gray")
-    font = get_font()
+    font = get_font(size=font_size)
 
     with h5py.File(hdf_path, "r") as f:
         imgs = f["rawimg"]
@@ -718,7 +717,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
         for i, (sub_start_idx, sub_end_idx) in tqdm(list(enumerate(pairwise(sub_idx))), desc="videos", unit="video"):
-            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx], i)
+            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx+30], i)
 
             with imageio.get_writer(
                 video_fn, format="FFMPEG", fps=fps, codec="libx264", quality=video_quality

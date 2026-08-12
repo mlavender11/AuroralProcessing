@@ -64,7 +64,7 @@ def add_time_stamp(frame, time_stamp, font):
     draw = ImageDraw.Draw(img)
     text = unix_to_str(time_stamp)
 
-    margin = 10
+    margin = 2
     # get text bounding box to know its height
     bbox = draw.textbbox((0, 0), text, font=font)
     text_height = bbox[3] - bbox[1]

@@ -3,3 +3,5 @@ __pycache__
 .DS_Store
 consumers/__pycache__
 process_night.py
+*.log
+.vscode
