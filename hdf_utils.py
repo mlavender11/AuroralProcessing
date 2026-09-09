@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 import datetime
 from pathlib import Path
 
@@ -225,6 +225,13 @@ def find_closest_item(arr, key):
     return left if abs(arr[left] - key) <= abs(arr[right] - key) else right
 
 
+def find_time_idx(time: datetime, ut_list):
+    _assert_utc(time)
+    time_unix = int(time.timestamp())
+    idx = find_closest_item(ut_list, time_unix)
+    return idx
+
+
 def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
     """
     Given a start time, end time, and unix epoch time list, returns index of the start and end time
@@ -244,15 +251,17 @@ def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
         Index of the frame closest to start_time and index of the frame
         closest to end_time.
     """
+    start_idx = find_time_idx(start_time, unix_list)
+    end_idx = find_time_idx(end_time, unix_list)
 
-    _assert_utc(start_time)
-    _assert_utc(end_time)
+    # _assert_utc(start_time)
+    # _assert_utc(end_time)
 
-    start_time_unix = int(start_time.timestamp())
-    end_time_unix = int(end_time.timestamp())
+    # start_time_unix = int(start_time.timestamp())
+    # end_time_unix = int(end_time.timestamp())
 
-    start_idx = find_closest_item(unix_list, start_time_unix)
-    end_idx = find_closest_item(unix_list, end_time_unix)
+    # start_idx = find_closest_item(unix_list, start_time_unix)
+    # end_idx = find_closest_item(unix_list, end_time_unix)
 
     return start_idx, end_idx
 
@@ -593,11 +602,10 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int, *, came
     # fn = out_dir / f"DMC_{date_str}_{hour_str}"
     # fn = out_dir / f'{camera}-'
 
-    if camera == 'HST':
-        fn = out_dir / f'{camera}-{serial}-{date_str}-{i}'
+    if camera == "HST":
+        fn = out_dir / f"{camera}-{serial}-{date_str}-{i}"
     else:
-        fn = out_dir / f'{camera}-{date_str}-{i}'
-        
+        fn = out_dir / f"{camera}-{date_str}-{i}"
 
     return fn.with_suffix(".mp4"), fn.with_suffix(".png")
 
@@ -617,7 +625,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     sample_rate_hz=None,
     font_size=16,
     make_keogram=True,
-    serial=None
+    serial=None,
 ):
     """
     Render one MP4 video and one keogram PNG per hour-aligned segment, with
@@ -727,7 +735,9 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
         for i, (sub_start_idx, sub_end_idx) in tqdm(list(enumerate(pairwise(sub_idx))), desc="videos", unit="video"):
-            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx+30], i, camera=camera, serial=serial)
+            video_fn, keogram_fn = build_output_paths(
+                hdf_path, out_dir, ut[sub_start_idx + 30], i, camera=camera, serial=serial
+            )
 
             with imageio.get_writer(
                 video_fn, format="FFMPEG", fps=fps, codec="libx264", quality=video_quality
