@@ -561,7 +561,7 @@ def make_video_from_times(
         return norm
 
 
-def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int):
+def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int, *, camera, serial):
     """
     build output paths like CamSer1387_20130414_07.png
 
@@ -590,7 +590,14 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int):
 
     # fn = out_dir / f"{cam_str}_{date_str}_{hour_str}"
     # fn = out_dir / f"{cam_str}_{date_str}_{i}"
-    fn = out_dir / f"DMC_{date_str}_{hour_str}"
+    # fn = out_dir / f"DMC_{date_str}_{hour_str}"
+    # fn = out_dir / f'{camera}-'
+
+    if camera == 'HST':
+        fn = out_dir / f'{camera}-{serial}-{date_str}-{i}'
+    else:
+        fn = out_dir / f'{camera}-{date_str}-{i}'
+        
 
     return fn.with_suffix(".mp4"), fn.with_suffix(".png")
 
@@ -599,6 +606,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     *,
     hdf_path,
     out_dir,
+    camera,
     start_time: datetime.datetime | None = None,
     end_time: datetime.datetime | None = None,
     bin_size=None,
@@ -607,7 +615,9 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     fps=None,
     norm=None,
     sample_rate_hz=None,
-    font_size=16
+    font_size=16,
+    make_keogram=True,
+    serial=None
 ):
     """
     Render one MP4 video and one keogram PNG per hour-aligned segment, with
@@ -717,7 +727,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
         for i, (sub_start_idx, sub_end_idx) in tqdm(list(enumerate(pairwise(sub_idx))), desc="videos", unit="video"):
-            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx+30], i)
+            video_fn, keogram_fn = build_output_paths(hdf_path, out_dir, ut[sub_start_idx+30], i, camera=camera, serial=serial)
 
             with imageio.get_writer(
                 video_fn, format="FFMPEG", fps=fps, codec="libx264", quality=video_quality
@@ -725,7 +735,7 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
                 video = VideoConsumer(
                     writer, font, frame_to_rgb, height, width, imgs.dtype, ut.dtype, bin_size=bin_size
                 )
-                n_bins, frames_per_bin = compute_keogram_bins(n_frames=sub_end_idx - sub_start_idx, ut=ut)
+                # n_bins, frames_per_bin = compute_keogram_bins(n_frames=sub_end_idx - sub_start_idx, ut=ut)
                 # keogram = KeogramConsumer(
                 #     height,
                 #     width,
@@ -747,9 +757,10 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
                 )
                 hour_start_ut = hour_start_dt.timestamp()
 
-                keogram = HourlyKeogramConsumer(
-                    height=height, width=width, cmap=cmap, norm=norm, outfn=keogram_fn, hour_start_ut=hour_start_ut
-                )
+                if make_keogram:
+                    keogram = HourlyKeogramConsumer(
+                        height=height, width=width, cmap=cmap, norm=norm, outfn=keogram_fn, hour_start_ut=hour_start_ut
+                    )
 
                 frame_range = range(sub_start_idx, sub_end_idx)
                 for n in tqdm(frame_range, desc=video_fn.stem, unit="frame", leave=False):
@@ -759,9 +770,11 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
                     if (n - sub_start_idx) % stride < bin_size:  # Selects the first bin_size frames in every stride
                         video.update(n, frame, frame_time)
 
-                    keogram.update(n, frame, frame_time)
+                    if make_keogram:
+                        keogram.update(n, frame, frame_time)
                 video.finalize()
-                keogram.finalize()
+                if make_keogram:
+                    keogram.finalize()
 
         return norm
 

@@ -24,17 +24,21 @@ def convert(drive_path, out_dir, excluded_terms):
     drive_path = Path(drive_path)
     DMC_folders = []
     for item in drive_path.iterdir():
-        if item.is_dir():
-            if any(item.glob("*.DMCdata")):
-                DMC_folders.append(item)
+        try:
+            if item.is_dir():
+                if any(item.glob("*.DMCdata")):
+                    DMC_folders.append(item)
+        except Exception as e:
+            print(f"Skipped {item.name}: {e}")
+
     DMC_files = []
     for folder in DMC_folders:
-        for DMC_file in folder.glob("*.DMCdata"):
-            DMC_files.append(DMC_file)
+        try:
+            for DMC_file in folder.glob("*.DMCdata"):
+                DMC_files.append(DMC_file)
+        except Exception as e:
+            print(f"Skipped folder {folder.name}: {e}")
 
-    # DMC_files_cleaned = [
-    #     file for file in DMC_files if not ("frames" in file.name or "test" in file.name or "2013" in file.name)
-    # ]
     DMC_files_cleaned = [file for file in DMC_files if not any(term in file.name for term in excluded_terms)]
 
     out_dir = Path(out_dir)
@@ -44,12 +48,6 @@ def convert(drive_path, out_dir, excluded_terms):
         print(f"Converting {DMC_fn}")
         try:
             out_fn = out_dir / DMC_fn.with_suffix(".h5").name
-            # log_fn = DMC_fn.with_suffix(".log")
-            # if not log_fn.exists():
-            #     print(f"Skipping: Log file not found for {DMC_fn} (expected {log_fn})")
-            #     print("." * 40 + "\n")
-            #     continue
-
             start_time = start_time_from_fn(DMC_fn)
             print(f"start time: {start_time}")
 
@@ -91,9 +89,9 @@ def make_summary(h5_folder, out_folder):
 
 
 def main():
-    data_path = Path("/Volumes/I")
-    h5_folder = Path("/Volumes/Elements/DMC_output")
-    video_folder = Path("/Users/labb/mlavender/DMC_videos")
+    data_path = Path("/Volumes/L")
+    h5_folder = Path("/Volumes/Elements/DMC_output/813")
+    video_folder = Path("/Users/labb/mlavender/DMC_videos/813")
     excluded_terms = ["frames", "test"]
 
     convert(drive_path=data_path, out_dir=h5_folder, excluded_terms=excluded_terms)

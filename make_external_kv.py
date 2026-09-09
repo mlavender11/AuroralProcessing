@@ -85,9 +85,9 @@ def make_fykn_video(date_str, out_dir):
         def process_frame(i):
             _, ax = at.display(images_scaled[:, :, i], cmap="gray", returnfig=True)
             ax.text(5, 240, "THEMIS ASI", color="white", size=14)
-            ax.text(5, 225, "ATHA", color="white", size=14)
+            ax.text(5, 225, "FYKN", color="white", size=14)
             ax.text(145, 8, data.timestamp[i].strftime("%Y-%m-%d %H:%M:%S UTC"), color="white", size=11)
-            filename = "movie_frames/%s_atha_themis.png" % (data.timestamp[i].strftime("%Y%m%d_%H%M%S"))
+            filename = "movie_frames/%s_fykn_themis.png" % (data.timestamp[i].strftime("%Y%m%d_%H%M%S"))
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             plt.savefig(filename, dpi=100)
             plt.close("all")

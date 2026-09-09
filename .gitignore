@@ -5,3 +5,6 @@ consumers/__pycache__
 process_night.py
 *.log
 .vscode
+*.bak
+*.csv
+*.xslx
