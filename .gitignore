@@ -10,3 +10,4 @@ process_night.py
 *.xslx
 *.h5
 *.mp4
+*.egg-info/
