@@ -7,7 +7,7 @@ process_night.py
 .vscode
 *.bak
 *.csv
-*.xslx
+*.xlsx
 *.h5
 *.mp4
 *.egg-info/
