@@ -1,5 +1,5 @@
 import importlib
-import hdf_utils
+from AuroralProcessing import hdf_utils
 from pathlib import Path
 import os
 from tqdm.auto import tqdm
@@ -9,12 +9,12 @@ import h5py
 import traceback
 
 # sys.path.append('/Users/michaellavender/Documents/BUSPC/batch_processing')
-from binary_to_hdf import whole_binary_to_hdf
+from AuroralProcessing.binary_to_hdf import whole_binary_to_hdf
 
-import keogram_consumer_hourly as kch
-import keogram_consumer
-import stats_consumer
-import video_consumer
+from AuroralProcessing.consumers import keogram_hourly as kch
+from AuroralProcessing.consumers import keogram as keogram_consumer
+from AuroralProcessing.consumers import stats as stats_consumer
+from AuroralProcessing.consumers import video as video_consumer
 
 importlib.reload(kch)
 importlib.reload(keogram_consumer)

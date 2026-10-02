@@ -1,5 +1,5 @@
 import numpy as np
-import hdf_utils
+from AuroralProcessing import hdf_utils
 import math
 import datetime
 from zoneinfo import ZoneInfo
