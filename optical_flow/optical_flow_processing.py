@@ -10,7 +10,7 @@ import sys
 import subprocess
 import argparse
 
-from AuroralProcessing.hdf_utils import compute_norm, compute_norm_from_hdf
+from auroral_processing.hdf_utils import compute_norm, compute_norm_from_hdf
 
 
 # Global tools
@@ -294,7 +294,7 @@ def repack(hdf_fn, replace=False):
 # Video creation
 def make_video(*, hdf_fn, out_fn, video_quality=6, playback_speed=None, fps=None, norm=None):
     import imageio
-    from AuroralProcessing.consumers.video import VideoConsumer
+    from auroral_processing.consumers.video import VideoConsumer
 
     hdf_fn = Path(hdf_fn)
     out_dir = Path(out_dir)

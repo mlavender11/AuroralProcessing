@@ -1,5 +1,5 @@
 import pandas as pd
-from AuroralProcessing.hdf_utils import compute_norm_from_hdf, make_hourly_videos_keograms
+from auroral_processing.hdf_utils import compute_norm_from_hdf, make_hourly_videos_keograms
 import datetime
 from pathlib import Path
 from tqdm.auto import tqdm
