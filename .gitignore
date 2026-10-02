@@ -8,3 +8,5 @@ process_night.py
 *.bak
 *.csv
 *.xslx
+*.h5
+*.mp4
