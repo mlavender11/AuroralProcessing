@@ -11,3 +11,5 @@ process_night.py
 *.h5
 *.mp4
 *.egg-info/
+*.npz
+

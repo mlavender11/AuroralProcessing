@@ -10,7 +10,6 @@ import sys
 import subprocess
 import argparse
 
-sys.path.insert(0, "/Users/michaellavender/Documents/BUSPC/processing")
 from AuroralProcessing.hdf_utils import compute_norm, compute_norm_from_hdf
 
 
