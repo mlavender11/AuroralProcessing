@@ -1,7 +1,7 @@
 # Command line script for making videos from HiST HDF5 files
 
 import argparse
-import hdf_utils
+from AuroralProcessing import hdf_utils
 from pathlib import Path
 import matplotlib.pyplot as plt
 import h5py
@@ -9,7 +9,7 @@ import datetime
 import numpy as np
 from tqdm.auto import tqdm
 import imageio
-from video_consumer import VideoConsumer
+from AuroralProcessing.consumers.video import VideoConsumer
 
 parser = argparse.ArgumentParser(description="Make video from HiST HDF5 file")
 parser.add_argument("filename", type=str, help="path to HDF5 file")

@@ -501,7 +501,7 @@ def make_video_from_times(
     from itertools import pairwise
     from pathlib import Path
     import imageio
-    from video_consumer import VideoConsumer
+    from AuroralProcessing.consumers.video import VideoConsumer
 
     if start_time is not None:
         _assert_utc(start_time)
@@ -677,8 +677,8 @@ def make_hourly_videos_keograms(  # TODO check these docstrings
     from itertools import pairwise
     from pathlib import Path
     import imageio
-    from video_consumer import VideoConsumer
-    from keogram_consumer_hourly import HourlyKeogramConsumer
+    from AuroralProcessing.consumers.video import VideoConsumer
+    from AuroralProcessing.consumers.keogram_hourly import HourlyKeogramConsumer
 
     if start_time is not None:
         _assert_utc(start_time)
@@ -809,7 +809,7 @@ def make_keogram_6_22_26(*, hdf_path, out_dir, bin_width_seconds=None, norm=None
         the whole file if not given.
     """
 
-    from keogram_consumer import KeogramConsumer
+    from AuroralProcessing.consumers.keogram import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
     out_dir = Path(out_dir)
@@ -861,7 +861,7 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
         sample_interval.
     """
 
-    from keogram_consumer import KeogramConsumer
+    from AuroralProcessing.consumers.keogram import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
     out_dir = Path(out_dir)

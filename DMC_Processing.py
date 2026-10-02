@@ -5,12 +5,12 @@
 
 
 from pathlib import Path
-import hdf_utils
+from AuroralProcessing import hdf_utils
 from tqdm.auto import tqdm
 from datetime import datetime
 
 # sys.path.append('/Users/michaellavender/Documents/BUSPC/batch_processing')
-# from binary_to_hdf import whole_binary_to_hdf
+# from AuroralProcessing.binary_to_hdf import whole_binary_to_hdf
 
 
 def start_time_from_fn(fn: Path):
@@ -59,7 +59,7 @@ def convert(drive_path, out_dir, excluded_terms):
 
 
 def make_summary(h5_folder, out_folder):
-    import hdf_utils
+    from AuroralProcessing import hdf_utils
     from pathlib import Path
     from tqdm.auto import tqdm
     import traceback
