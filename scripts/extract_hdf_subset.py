@@ -53,7 +53,7 @@ def copy_datasets(src: h5py.File, dst: h5py.File, start_idx, end_idx):
         raise ValueError(f"Empty frame range: start_idx={start_idx}, end_idx={end_idx}")
 
     n = end_idx - start_idx
-    frame_dsets = ["rawimg", "rawimg", "ut1_unix"]  # datasets corresponding to frames, to copy subsets from
+    frame_dsets = ["rawimg", "rawind", "ut1_unix"]  # datasets corresponding to frames, to copy subsets from
 
     dst.attrs.update(src.attrs)
 
@@ -71,12 +71,13 @@ def copy_datasets(src: h5py.File, dst: h5py.File, start_idx, end_idx):
             dtype=src_d.dtype,
             chunks=(min(src_d.chunks[0], n), *src_d.chunks[1:]),
             compression=src_d.compression,
+            shuffle=src_d.shuffle,
             compression_opts=src_d.compression_opts,
             fletcher32=src_d.fletcher32,
         )
 
         step = 256  # copy 256 frames at once
-        for i in tqdm(range(start_idx, end_idx, step), desc=f"Dataset: {name}"):
+        for i in tqdm(range(start_idx, end_idx, step), desc=name, unit="Frame"):
             j = min(i + step, end_idx)
             out_d[i - start_idx : j - start_idx] = src_d[i:j]
 
