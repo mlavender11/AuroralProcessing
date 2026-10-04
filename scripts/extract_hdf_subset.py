@@ -96,7 +96,6 @@ def main():
 
     # start and end times in utc format
     start_time, end_time = get_start_end_time(args.filename, args.start_time, args.end_time)
-    breakpoint()
 
     if args.output_filename is None:
         src_fn = Path(args.filename)
@@ -106,9 +105,7 @@ def main():
         out_fn = args.output_filename
 
     with h5py.File(args.filename, "r") as src_f, h5py.File(out_fn, "w") as out_f:
-        breakpoint()
         start_idx, end_idx = get_start_end_idx(start_time=start_time, end_time=end_time, unix_list=src_f["ut1_unix"])
-        breakpoint()
 
         copy_datasets(src_f, out_f, start_idx=start_idx, end_idx=end_idx)
 
