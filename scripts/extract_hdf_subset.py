@@ -4,7 +4,7 @@ HDF5 file expected to have frames in 'rawimg' and ut time in 'ut1_unix'
 """
 
 import argparse
-from auroral_processing.hist.datetime_utils import get_start_end_time
+from auroral_processing.hist.datetime_utils import get_start_end_datetime
 from auroral_processing.hist.io import extract_clip
 
 
@@ -19,7 +19,7 @@ def main():
     args = parser.parse_args()
 
     # start and end times in utc format
-    start_time, end_time = get_start_end_time(args.filename, args.start_time, args.end_time)
+    start_time, end_time = get_start_end_datetime(args.filename, args.start_time, args.end_time)
     extract_clip(args.filename, start_time, end_time, args.output_filename)
 
 
