@@ -1,3 +1,15 @@
+"""
+Read and subset HiST HDF5 camera files.
+
+HiST HDF5 files hold per-frame datasets that share a leading frame axis:
+
+- ``rawimg`` : image frames, shape (n_frames, height, width)
+- ``rawind`` : frame indices, shape (n_frames,)
+- ``ut1_unix`` : frame timestamps as Unix epoch seconds (UTC), shape (n_frames,)
+
+Any other datasets in the file are treated as metadata and copied whole.
+"""
+
 from datetime import datetime, timezone
 import h5py
 from tqdm.auto import tqdm
@@ -10,6 +22,26 @@ TIME_DSET = "ut1_unix"
 
 # TODO move?
 def available_time_range(hdf_fn):
+    """
+    Get the time span covered by a HiST HDF5 file.
+
+    Parameters
+    ----------
+    hdf_fn : str or pathlib.Path
+        Path to an HDF5 file containing a ``ut1_unix`` dataset.
+
+    Returns
+    -------
+    start_datetime : datetime.datetime
+        UTC time of the first frame (timezone-aware).
+    end_datetime : datetime.datetime
+        UTC time of the last frame (timezone-aware).
+
+    Notes
+    -----
+    Uses the first and last entries of ``ut1_unix``, so it assumes the
+    timestamps are sorted in ascending order.
+    """
     with h5py.File(hdf_fn, "r") as f:
         ut = f["ut1_unix"]
         start_timestamp = ut[0]
@@ -22,6 +54,43 @@ def available_time_range(hdf_fn):
 
 
 def copy_datasets(src: h5py.File, dst: h5py.File, start_idx, end_idx):
+    """
+    Copy a range of frames from one open HiST HDF5 file to another.
+
+    The per-frame datasets (``rawimg``, ``rawind``, ``ut1_unix``) are sliced
+    to frames ``[start_idx, end_idx)``. Every other dataset is copied
+    whole, and both file-level and per-dataset attributes are copied.
+
+    Parameters
+    ----------
+    src : h5py.File
+        Open source file (read mode).
+    dst : h5py.File
+        Open destination file (write mode). It must not already contain
+        datasets with the same names.
+    start_idx : int
+        Index of the first frame to copy (inclusive).
+    end_idx : int
+        Index to stop at (exclusive).
+
+    Raises
+    ------
+    ValueError
+        If ``end_idx < start_idx``.
+
+    Notes
+    -----
+    Each output dataset keeps the source's chunking (with the frame-axis
+    chunk capped at the number of frames copied), compression, shuffle and
+    fletcher32 settings. Frames are copied 256 at a time to limit memory use.
+
+    TODO: ``start_idx == end_idx`` passes the check above but creates
+    zero-length datasets, and ``min(src_d.chunks[0], 0)`` gives a zero
+    chunk size, which h5py may reject. Confirm what should happen here.
+    TODO: assumes each per-frame dataset is chunked (``src_d.chunks`` is not
+    None); a contiguous dataset would raise a TypeError. Confirm all HiST
+    files are chunked.
+    """
     # Copys HiST HDF5 datasets from start_idx to end_idx
     # expects opened HDF5 files
 
@@ -62,6 +131,34 @@ def copy_datasets(src: h5py.File, dst: h5py.File, start_idx, end_idx):
 
 
 def extract_clip(src_fn, start: datetime, end: datetime, out_fn=None):
+    """
+    Save the frames between two times from a HiST HDF5 file to a new file.
+
+    Parameters
+    ----------
+    src_fn : str or pathlib.Path
+        Path to the source HDF5 file.
+    start : datetime.datetime
+        UTC start time of the clip.
+    end : datetime.datetime
+        UTC end time of the clip.
+    out_fn : str or pathlib.Path, optional
+        Output path. By default the file is written next to ``src_fn`` and
+        named ``<stem>_<HHMMSS>-<HHMMSS>.h5`` from the start and end times.
+        An existing file at this path is overwritten.
+
+    Returns
+    -------
+    str or pathlib.Path
+        Path of the written file.
+
+    Notes
+    -----
+    ``start`` and ``end`` are matched to the nearest frames using
+    ``hdf_utils.get_start_end_idx``. Because ``copy_datasets`` treats the
+    end index as exclusive, the frame nearest ``end`` is not included.
+    TODO: confirm whether the end frame should be included.
+    """
     if out_fn is None:
         src_fn = Path(src_fn)
         duration_str = f"{start:%H%M%S}-{end:%H%M%S}"
