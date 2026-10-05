@@ -1,7 +1,7 @@
 from pathlib import Path
 import argparse
 import h5py
-from datetime import datetime
+from datetime import datetime, timezone
 
 DRIVE_DIR = Path("...")
 
@@ -9,10 +9,19 @@ DRIVE_DIR = Path("...")
 def available_dates(): ...
 
 
-def available_times(date, camera): ...
+def available_time_range(hdf_fn):
+    with h5py.File(hdf_fn, "r") as f:
+        ut = f["ut1_unix"]
+        start_timestamp = ut[0]
+        end_timestamp = ut[-1]
+
+        start_datetime = datetime.fromtimestamp(start_timestamp, tz=timezone.utc)
+        end_datetime = datetime.fromtimestamp(end_timestamp, tz=timezone.utc)
+
+    return start_datetime, end_datetime
 
 
-def available_cams(date): ...
+def available_cams(): ...
 
 
 def get_available(): ...
