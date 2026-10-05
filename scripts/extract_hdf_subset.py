@@ -4,8 +4,8 @@ HDF5 file expected to have frames in 'rawimg' and ut time in 'ut1_unix'
 """
 
 import argparse
-from auroral_processing.HiST.datetime_utils import get_start_end_time
-from auroral_processing.HiST.io import extract_clip
+from auroral_processing.hist.datetime_utils import get_start_end_time
+from auroral_processing.hist.io import extract_clip
 
 
 def main():

@@ -1,6 +1,6 @@
 import argparse
-from auroral_processing.HiST.database import get_available
-from auroral_processing.HiST.io import ...
+from auroral_processing.hist.database import get_available
+from auroral_processing.hist.io import ...
 
 
 

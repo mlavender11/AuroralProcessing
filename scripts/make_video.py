@@ -1,4 +1,4 @@
-# Command line script for making videos from HiST HDF5 files
+# Command line script for making videos from hist HDF5 files
 
 import argparse
 from auroral_processing import hdf_utils
