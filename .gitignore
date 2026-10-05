@@ -3,6 +3,7 @@ __pycache__
 .DS_Store
 consumers/__pycache__
 process_night.py
+optical_flow/papers/
 *.log
 .vscode
 *.bak
