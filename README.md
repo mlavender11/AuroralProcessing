@@ -31,8 +31,8 @@ Optional, depending on what you run:
 auroral_processing/     Python package
     binary_to_hdf.py      raw .DMCdata (+ .xml, .nmea) -> HDF5
     hdf_utils.py          normalisation, videos, keograms (main functionality)
-    consumers/            per-frame endpoints with update() / finalize():
-                          video, keogram, hourly keogram, stats
+    consumers/            consume frames to make outputs:
+                          video, keogram, hourly keogram
     hist/                 HiST HDF5 helpers
         io.py               time range of a file, clip extraction
         datetime_utils.py   date/time parsing for filenames and clips
