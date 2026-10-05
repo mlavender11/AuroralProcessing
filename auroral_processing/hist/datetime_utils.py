@@ -108,5 +108,18 @@ def get_time_bounds():
     ...
 
 
-def datetime_from_unix(timestamp) -> datetime:
+def datetime_from_unix(timestamp: float) -> datetime:
+    """
+    Convert a Unix timestamp to a timezone-aware UTC datetime
+
+    Parameters
+    ----------
+    timestamp : float or int
+        Seconds since the Unix epoch. Anything convertible with ``float()`` is accepted.
+
+    Returns
+    -------
+    datetime
+        Timezone-aware datetime with ``tzinfo=timezone.utc``.
+    """
     return datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
