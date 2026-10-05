@@ -5,6 +5,7 @@ from pathlib import Path
 from collections import deque
 from functools import partial
 from itertools import islice
+import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import sys
 import subprocess
@@ -189,7 +190,7 @@ def frame_binning_avg(src, bin_size=15, frame_shape=(512, 512)):
     frame_sum = None
     for frame in src:
         if frame_sum is None:
-            frame_sum = np.zeros_like(frame_shape, dtype=np.float64)
+            frame_sum = np.zeros(frame_shape, dtype=np.float64)
 
         # Accumulate frames, continue until bin is full
         frame_sum += frame
@@ -207,8 +208,8 @@ def to_uint8(src, lo=0.0, hi=1.0):
     for frame in src:
         clipped = np.clip((frame - lo) * scale, 0, 255)
         rounded = np.rint(clipped)
-        int_frame = round.astype(np.uint8)
-        yield rounded
+        int_frame = rounded.astype(np.uint8)
+        yield int_frame
 
 
 # Pipeline
@@ -260,15 +261,16 @@ def apply_processing(hdf_fn):
         vmin, vmax = get_vmin_vmax(f)  # TODO get norm
         total_frames = len(frames)
 
+        bin_size = 15
         pipeline = chain(
             read_h5(frames),
             partial(normalize, vmin=vmin, vmax=vmax),
             partial(spatial_median, k=3),
-            partial(frame_binning_avg),
+            partial(frame_binning_avg, bin_size),
             to_uint8,
         )
 
-        n = write_h5(pipeline, f, "pipeline-full", total_frames=total_frames, compression="lzf")
+        n = write_h5(pipeline, f, "pipeline-full", total_frames=total_frames // bin_size, compression="lzf")
         print(f"wrote {n} frames")
 
 
@@ -321,8 +323,9 @@ def make_video(*, hdf_fn, out_fn, video_quality=6, playback_speed=None, fps=None
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pre-Processing frames in HDF5 file")
     parser.add_argument("hdf_fn", help="path to the HDF5 file")
-    parser.add_argument("--repack", action="store_true", help="repack the HDF file")
+    parser.add_argument("-r", "--repack", action="store_true", help="repack the HDF file")
     parser.add_argument(
+        "-i",
         "--inplace",
         action="store_true",
         help="with --repack: overwrite the original file instead of writing seperate .repacked.h5",
