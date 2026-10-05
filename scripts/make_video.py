@@ -30,6 +30,8 @@ font = hdf_utils.get_font(size=16)
 with h5py.File(hdf_path, "r") as f:
     imgs = f["rawimg"]
     ut = f["ut1_unix"][:]
+    # imgs = f["pipeline-full"] TODO make this a parameter
+    # ut = f["pipeline-full-ut1_unix"]
     n_frames, height, width = imgs.shape
 
     start_time = datetime.datetime.fromtimestamp(ut[0], datetime.timezone.utc)

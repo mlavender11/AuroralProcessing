@@ -203,12 +203,12 @@ def frame_binning_avg(src, bin_size=15, frame_shape=(512, 512)):
             frame_sum, counter = None, 0
 
 
-def to_uint8(src, lo=0.0, hi=1.0):
+def to_uint16(src, lo=0.0, hi=1.0):
     scale = 255.0 / (hi - lo)
     for frame in src:
         clipped = np.clip((frame - lo) * scale, 0, 255)
         rounded = np.rint(clipped)
-        int_frame = rounded.astype(np.uint8)
+        int_frame = rounded.astype(np.uint16)
         yield int_frame
 
 
@@ -223,7 +223,7 @@ def chain(src, *stages):
 
 
 # driver - used to pull from the end of a chain of generator stages
-def write_h5(src, hdf_file, dataset_name, total_frames, dtype=np.uint8, compression=None, block=64, attrs=None):
+def write_h5(src, hdf_file, dataset_name, total_frames, dtype=np.uint16, compression=None, block=64, attrs=None):
     f = hdf_file
 
     if dataset_name in f:
@@ -266,12 +266,21 @@ def apply_processing(hdf_fn):
             read_h5(frames),
             partial(normalize, vmin=vmin, vmax=vmax),
             partial(spatial_median, k=3),
-            partial(frame_binning_avg, bin_size),
-            to_uint8,
+            partial(frame_binning_avg, bin_size=bin_size),
+            to_uint16,
         )
 
         n = write_h5(pipeline, f, "pipeline-full", total_frames=total_frames // bin_size, compression="lzf")
         print(f"wrote {n} frames")
+        ut = f["ut1_unix"][:]
+        ut_binned = ut[: n * bin_size].reshape(n, bin_size).mean(axis=1)
+
+        name = "pipeline-full-ut1_unix"
+        if name in f:
+            del f[name]
+        f.create_dataset(name, data=ut_binned)
+
+        f["pipeline-full"].attrs["bin_size"] = bin_size
 
 
 def repack(hdf_fn, replace=False):
