@@ -4,7 +4,8 @@ Tools for processing high-speed auroral camera data (HiST / DMC): converting raw
 camera binaries to HDF5, cutting clips, and producing videos, keograms and
 summary statistics. Also contains exploratory optical-flow work on auroral motion.
 
-> **Note:** I am currently restructuring this package. The planned layout is on the
+> [!IMPORTANT]
+> I am currently restructuring this package. The planned layout is on the
 > [`restructuring`](../../tree/restructuring) branch; `main` holds the current working code.
 
 ## Install
