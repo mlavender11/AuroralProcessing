@@ -42,7 +42,8 @@ with h5py.File(hdf_path, "r") as f:
     frame_to_rgb = hdf_utils.get_frame_to_rgb(cmap, norm)
 
     # with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="libx264", quality=6) as writer:
-    with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="h264_videotoolbox", bitrate="8M") as writer:
+    # with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="h264_videotoolbox", bitrate="8M") as writer:
+    with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="libx264", quality=9) as writer:
         video = VideoConsumer(writer, font, frame_to_rgb, height, width, imgs.dtype, ut.dtype, bin_size=1)
 
         for n in tqdm(range(n_frames), desc=str(out_path), unit="frame"):
