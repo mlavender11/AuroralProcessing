@@ -40,8 +40,7 @@ auroral_processing/     Python package
 scripts/                Command-line and batch scripts
 notebooks/              DMC_Processing and FullPipeline notebooks
 optical_flow/           Optical-flow experiments: OpenCV (Farneback, TV-L1),
-                        OpenPIV, FLCT, MATLAB (Black & Anandan / Horn-Schunck),
-                        and reference papers
+                        OpenPIV, FLCT, MATLAB (Black & Anandan / Horn-Schunck)
 ```
 
 ## Data format
