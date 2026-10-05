@@ -98,13 +98,15 @@ def main():
     # start and end times in utc format
     start_time, end_time = get_start_end_time(args.filename, args.start_time, args.end_time)
 
+    # file naming
     if args.output_filename is None:
         src_fn = Path(args.filename)
-        duration_str = f"{args.start_time}-{args.end_time}".replace(":", "")
+        duration_str = f"{start_time:%H%M%S}-{end_time:%H%M%S}"
         out_fn = src_fn.with_name(f"{src_fn.stem}_{duration_str}.h5")
     else:
         out_fn = args.output_filename
 
+    # copy files
     with h5py.File(args.filename, "r") as src_f, h5py.File(out_fn, "w") as out_f:
         start_idx, end_idx = get_start_end_idx(start_time=start_time, end_time=end_time, unix_list=src_f["ut1_unix"])
 
