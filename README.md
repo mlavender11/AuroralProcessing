@@ -80,3 +80,7 @@ for your machine before running.
 
 Generated outputs (`*.h5`, `*.mp4`, `*.png`, `*.npz`, `*.csv`, `*.xlsx`, `*.log`)
 are git-ignored.
+
+## Author
+
+Michael Lavender, Boston University ECE
