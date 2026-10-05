@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 import h5py
 from tqdm.auto import tqdm
+from pathlib import Path
+from auroral_processing.hdf_utils import get_start_end_idx
 
 FRAME_DSETS = ["rawimg", "rawind", "ut1_unix"]
 TIME_DSET = "ut1_unix"
@@ -56,3 +58,16 @@ def copy_datasets(src: h5py.File, dst: h5py.File, start_idx, end_idx):
 
         for key, value in src_d.attrs.items():
             out_d.attrs[key] = value
+
+
+def extract_clip(src_fn, start: datetime, end: datetime, out_fn=None):
+    if out_fn is None:
+        src_fn = Path(src_fn)
+        duration_str = f"{start:%H%M%S}-{end:%H%M%S}"
+        out_fn = src_fn.with_name(f"{src_fn.stem}_{duration_str}.h5")
+
+    with h5py.File(src_fn, "r") as src_f, h5py.File(out_fn, "w") as out_f:
+        start_idx, end_idx = get_start_end_idx(start_time=start, end_time=end, unix_list=src_f["ut1_unix"])
+        copy_datasets(src_f, out_f, start_idx=start_idx, end_idx=end_idx)
+
+    return out_fn
