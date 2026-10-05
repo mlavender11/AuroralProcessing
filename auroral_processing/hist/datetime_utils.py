@@ -106,3 +106,7 @@ def get_time_bounds():
     can't be determined from the code.
     """
     ...
+
+
+def datetime_from_unix(timestamp) -> datetime:
+    return datetime.fromtimestamp(float(timestamp), tz=timezone.utc)

@@ -15,12 +15,12 @@ import h5py
 from tqdm.auto import tqdm
 from pathlib import Path
 from auroral_processing.hdf_utils import get_start_end_idx
+from .datetime_utils import datetime_from_unix
 
 FRAME_DSETS = ["rawimg", "rawind", "ut1_unix"]
 TIME_DSET = "ut1_unix"
 
 
-# TODO move?
 def available_time_range(hdf_fn):
     """
     Get the time span covered by a HiST HDF5 file.
@@ -47,8 +47,8 @@ def available_time_range(hdf_fn):
         start_timestamp = ut[0]
         end_timestamp = ut[-1]
 
-        start_datetime = datetime.fromtimestamp(start_timestamp, tz=timezone.utc)
-        end_datetime = datetime.fromtimestamp(end_timestamp, tz=timezone.utc)
+        start_datetime = datetime_from_unix(start_timestamp)
+        end_datetime = datetime_from_unix(end_timestamp)
 
     return start_datetime, end_datetime
 
