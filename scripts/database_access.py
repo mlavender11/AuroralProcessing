@@ -1,15 +1,11 @@
 import argparse
 from auroral_processing.hist.database import get_available
-from auroral_processing.hist.io import ...
-
 
 
 def available_dates(): ...
 
 
 def datetime_from_str(date_str): ...
-
-
 
 
 if __name__ == "__main__":
@@ -36,6 +32,6 @@ if __name__ == "__main__":
     elif args.available:
         get_available(...)
     elif args.extract:
-        extract(...) # TODO implement, in io?
+        extract(...)  # TODO implement, in io?
     else:
         raise ValueError("Error: neither -a or -e selected")

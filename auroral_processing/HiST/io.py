@@ -8,6 +8,7 @@ FRAME_DSETS = ["rawimg", "rawind", "ut1_unix"]
 TIME_DSET = "ut1_unix"
 
 
+# TODO move?
 def available_time_range(hdf_fn):
     with h5py.File(hdf_fn, "r") as f:
         ut = f["ut1_unix"]

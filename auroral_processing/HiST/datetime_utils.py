@@ -15,7 +15,7 @@ def get_date_str(filename):
         return match.group(0)
 
 
-def get_start_end_time(filename, start_time, end_time):
+def get_start_end_datetime(filename, start_time, end_time):
     # Start and end datetime objects in UTC
     # Expects file name like 2013-03-27-CamSer7196.h5 - just needs to start with YYYY-MM-DD
     # start_time and end_time in HH:MM:SS
@@ -34,3 +34,6 @@ def get_start_end_time(filename, start_time, end_time):
     end = datetime.combine(date, end_time, tzinfo=tz)
 
     return start, end
+
+
+def get_time_bounds(): ...
