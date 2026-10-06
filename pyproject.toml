@@ -11,6 +11,10 @@ dependencies = [
     "imageio[ffmpeg]",
     "pandas",
 ]
+authors = [
+    { name = "Michael Lavender", email = "michaelzlavender@gmail.com" },
+]
+
 
 [project.optional-dependencies]
 dmc = ["histutils @ git+https://github.com/space-physics/histutils.git"]
@@ -24,7 +28,4 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["auroral_processing*"]
 
-authors = [
-    { name = "Michael Lavender", email = "michaelzlavender@gmail.com" },
-]
 
