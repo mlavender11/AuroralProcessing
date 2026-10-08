@@ -12,7 +12,7 @@ from histutils.hstxmlparse import xmlparam
 
 def sibling_paths(raw_path):
     dmc = Path(raw_path).expanduser()
-    xml  = dmc.with_suffix(".xml").expanduser()
+    xml = dmc.with_suffix(".xml").expanduser()
     nmea = dmc.with_suffix(".nmea").expanduser()
     for p in (dmc, xml, nmea):
         if not p.exists():
@@ -22,7 +22,7 @@ def sibling_paths(raw_path):
 
 def whole_binary_to_hdf(dmc_path, out_dir):
     # path to the data. This will probably be distinct for your computer.
-    dmc_fn, xml_fn, nmea_fn = sibling_paths(dmc_path) 
+    dmc_fn, xml_fn, nmea_fn = sibling_paths(dmc_path)
 
     # where to store the converted data
     out_fn = Path(out_dir) / (Path(dmc_path).stem + ".h5")
@@ -52,9 +52,7 @@ def whole_binary_to_hdf(dmc_path, out_dir):
     pprint(params)
 
     if out_fn.is_file():
-        raise FileExistsError(
-            f"{out_fn} already exists. Please delete or move it before running this script."
-        )
+        raise FileExistsError(f"{out_fn} already exists. Please delete or move it before running this script.")
 
     i0, iend = histutils.index.getRawInd(dmc_fn, params)
     print(f"first raw frame index: {i0}, last raw frame index: {iend}")
@@ -63,14 +61,15 @@ def whole_binary_to_hdf(dmc_path, out_dir):
     tUTC = histutils.dio.frame2ut1(params["startUTC"], params["kineticsec"], iraw)
     print(f"raw frames cover {tUTC[0]} to {tUTC[-1]}")
 
-
     histutils.dio.vid2h5(dmc_fn, out_fn, rawind=iraw, params=params)
 
+
 def main():
-    dmc_fn = '/Users/michaellavender/Documents/BUSPC/binary2hdfTest/2013-04-11T07-00-CamSer1387_frames_402209-1-403708.DMCdata'
-    out_dir = '/Users/michaellavender/Documents/BUSPC/binary2hdfTest'
-    print('saving')
+    dmc_fn = "/Users/michaellavender/Documents/BUSPC/binary2hdfTest/2013-04-11T07-00-CamSer1387_frames_402209-1-403708.DMCdata"
+    out_dir = "/Users/michaellavender/Documents/BUSPC/binary2hdfTest"
+    print("saving")
     whole_binary_to_hdf(dmc_fn, out_dir)
+
 
 if __name__ == "__main__":
     main()
