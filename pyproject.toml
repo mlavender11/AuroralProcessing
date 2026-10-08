@@ -28,4 +28,5 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["auroral_processing*"]
 
-
+[project.scripts]
+aurora = "auroral_processing.cli:main"
