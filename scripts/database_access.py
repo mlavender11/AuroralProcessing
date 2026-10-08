@@ -32,6 +32,7 @@ if __name__ == "__main__":
     elif args.available:
         get_available(...)
     elif args.extract:
-        extract(...)  # TODO implement, in io?
+        ...
+        # extract(...)  # TODO implement, in io?
     else:
         raise ValueError("Error: neither -a or -e selected")
