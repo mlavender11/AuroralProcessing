@@ -1,7 +1,17 @@
 import numpy as np
 from PIL import ImageFont
 from auroral_processing.utils.binning import calculate_bin_size, calculate_fps
+from auroral_processing.utils.timing import _assert_utc, get_start_end_idx, get_hourly_sub_idx
+from auroral_processing.utils.norm import compute_norm
+from auroral_processing.pipeline.frame_ops import get_frame_to_rgb
+from auroral_processing.consumers.video import VideoConsumer
+from datetime import datetime, timezone
+from pathlib import Path
 from tqdm.auto import tqdm
+from itertools import pairwise
+import imageio
+import matplotlib.pyplot as plt
+import h5py
 
 
 def get_font(size=16):
@@ -65,8 +75,8 @@ def make_video_from_times(
     *,
     hdf_path,
     out_dir,
-    start_time: datetime.datetime | None = None,
-    end_time: datetime.datetime | None = None,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
     bin_size=None,
     video_quality=6,
     playback_speed=None,
@@ -84,10 +94,10 @@ def make_video_from_times(
         datasets.
     out_dir : str or pathlib.Path
         Directory to write output videos to; created if it doesn't exist.
-    start_time : datetime.datetime, optional
+    start_time : datetime, optional
         UTC start of the range to render. Defaults to the first frame's
         timestamp.
-    end_time : datetime.datetime, optional
+    end_time : datetime, optional
         UTC end of the range to render. Defaults to the last frame's
         timestamp.
     bin_size : int, optional
@@ -113,11 +123,6 @@ def make_video_from_times(
         computed).
     """
 
-    from itertools import pairwise
-    from pathlib import Path
-    import imageio
-    from auroral_processing.consumers.video import VideoConsumer
-
     if start_time is not None:
         _assert_utc(start_time)
     if end_time is not None:
@@ -136,9 +141,9 @@ def make_video_from_times(
         n_frames, height, width = imgs.shape
 
         if start_time is None:
-            start_time = datetime.datetime.fromtimestamp(ut[0], datetime.timezone.utc)
+            start_time = datetime.fromtimestamp(ut[0], timezone.utc)
         if end_time is None:
-            end_time = datetime.datetime.fromtimestamp(ut[-1], datetime.timezone.utc)
+            end_time = datetime.fromtimestamp(ut[-1], timezone.utc)
 
         playback_speed, fps, bin_size = assert_video_parameters(playback_speed, fps, bin_size, ut)
 
@@ -149,7 +154,7 @@ def make_video_from_times(
                 out_dir
                 / (
                     hdf_path.stem
-                    + f'_{datetime.datetime.fromtimestamp(ut[s], datetime.timezone.utc).strftime("%H-%M-%S")}_{datetime.datetime.fromtimestamp(ut[e], datetime.timezone.utc).strftime("%H-%M-%S")}'
+                    + f'_{datetime.fromtimestamp(ut[s], timezone.utc).strftime("%H-%M-%S")}_{datetime.fromtimestamp(ut[e], timezone.utc).strftime("%H-%M-%S")}'
                 )
             ).with_suffix(".mp4")
             for s, e in pairwise(sub_idx)
