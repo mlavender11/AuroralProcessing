@@ -9,8 +9,6 @@ import h5py
 import traceback
 
 # sys.path.append('/Users/michaellavender/Documents/BUSPC/batch_processing')
-from auroral_processing.binary_to_hdf import whole_binary_to_hdf
-
 from auroral_processing.consumers import keogram_hourly as kch
 from auroral_processing.consumers import keogram as keogram_consumer
 from auroral_processing.consumers import stats as stats_consumer
