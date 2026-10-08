@@ -3,6 +3,7 @@ from pprint import pprint
 
 import numpy as np
 
+# TODO why isn't histutils found?
 import histutils.dio
 import histutils.index
 import histutils.timedmc as hstt
