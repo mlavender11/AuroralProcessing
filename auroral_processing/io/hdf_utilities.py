@@ -2,6 +2,7 @@ import h5py
 from tqdm.auto import tqdm
 from pathlib import Path
 import datetime
+from auroral_processing.utils.timing import get_start_end_idx
 
 # TODO Repack, explore
 FRAME_DSETS = ["rawimg", "rawind", "ut1_unix"]
