@@ -1,6 +1,8 @@
 import numpy as np
+from datetime import datetime, timezone
 import datetime
 import h5py
+from pathlib import Path
 
 
 def find_closest_item(arr, key):
@@ -70,7 +72,7 @@ def get_start_end_idx(start_time: datetime, end_time: datetime, unix_list):
     return start_idx, end_idx
 
 
-def _assert_utc(dt: datetime.datetime) -> None:
+def _assert_utc(dt: datetime) -> None:
     """
     Asserts that a datetime object is in UTC.
 
@@ -88,7 +90,7 @@ def _assert_utc(dt: datetime.datetime) -> None:
         raise ValueError(f"datetime must be timezone-aware and in UTC, got: {dt!r}")
 
 
-def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.datetime):
+def get_hourly_boundaries(start_time: datetime, end_time: datetime):
     """
     Given a start and end time, return a list containing the start time, the top of every hour until the end time, and the end time.
 
@@ -122,7 +124,7 @@ def get_hourly_boundaries(start_time: datetime.datetime, end_time: datetime.date
     return hours
 
 
-def get_hourly_sub_idx(ut, start_time: datetime.datetime, end_time: datetime.datetime):
+def get_hourly_sub_idx(ut, start_time: datetime, end_time: datetime):
     """
     Given a start time, end time, and list of unix epoch times, return a list
     containing the indices of the start time, the top of every hour until the
