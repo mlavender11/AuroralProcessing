@@ -2,6 +2,7 @@ from pathlib import Path
 import h5py
 from auroral_processing.utils.norm import compute_norm
 from auroral_processing.utils.binning import compute_keogram_bins
+from auroral_processing.consumers.keogram import KeogramConsumer
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import numpy as np
@@ -26,8 +27,6 @@ def make_keogram_6_22_26(*, hdf_path, out_dir, bin_width_seconds=None, norm=None
         Normalization to apply to pixel values. Computed automatically over
         the whole file if not given.
     """
-
-    from auroral_processing.consumers.keogram import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
     out_dir = Path(out_dir)
@@ -78,8 +77,6 @@ def make_keogram_rougher(*, hdf_path, out_dir, bin_size_seconds, sample_interval
         If frames_per_bin computed from bin_size_seconds is not smaller than
         sample_interval.
     """
-
-    from auroral_processing.consumers.keogram import KeogramConsumer
 
     cmap = plt.get_cmap("gray")
     out_dir = Path(out_dir)
