@@ -10,8 +10,7 @@ TODO: this module does not currently import, because of the unfinished
 
 from pathlib import Path
 from datetime import datetime, timezone
-from .datetime_utils import get_start_end_datetime, get_date_str
-from .io import available_time_range
+from auroral_processing.utils.timing import available_time_range
 
 DRIVE_DIR = Path("...")  # TODO: placeholder; set to the root of the HDF5 data drive
 
