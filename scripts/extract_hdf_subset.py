@@ -3,8 +3,6 @@ CLI Interface for extract_clip in auroral_processing.io.hdf_utilities
 """
 
 import argparse
-from auroral_processing.utils.timing import get_start_end_datetime
-from auroral_processing.io.hdf_utilities import extract_clip
 
 
 def main():
@@ -18,8 +16,6 @@ def main():
     args = parser.parse_args()
 
     # start and end times in utc format
-    start_time, end_time = get_start_end_datetime(args.filename, args.start_time, args.end_time)
-    extract_clip(args.filename, start_time, end_time, args.output_filename)
 
 
 if __name__ == "__main__":
