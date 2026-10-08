@@ -1,11 +1,10 @@
 """
-Extract subset of HiST HDF5 file based on start and end time
-HDF5 file expected to have frames in 'rawimg' and ut time in 'ut1_unix'
+CLI Interface for extract_clip in auroral_processing.io.hdf_utilities
 """
 
 import argparse
-from auroral_processing.hist.datetime_utils import get_start_end_datetime
-from auroral_processing.hist.io import extract_clip
+from auroral_processing.utils.timing import get_start_end_datetime
+from auroral_processing.io.hdf_utilities import extract_clip
 
 
 def main():
