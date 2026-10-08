@@ -188,3 +188,48 @@ def make_video_from_times(
                 video.finalize()
 
         return norm
+
+
+def make_video_from_source(src_fn, out_fn=None):
+    """
+    Make a video from a HiST HDF File
+    Output is at source frame-rate, no binning or averaging
+    Used for testing flow preprocessing
+    """
+
+    hdf_path = Path(src_fn)
+
+    if not out_fn:
+        out_path = Path(out_fn).with_suffix(".mp4")
+    else:
+        out_path = Path(out_fn).mkdir(parents=True, exist_ok=True)
+
+    cmap = plt.get_cmap("gray")
+    font = get_font(size=16)
+
+    with h5py.File(hdf_path, "r") as f:
+        imgs = f["rawimg"]
+        ut = f["ut1_unix"][:]
+        # imgs = f["pipeline-full"] TODO make this a parameter
+        # ut = f["pipeline-full-ut1_unix"]
+        n_frames, height, width = imgs.shape
+
+        start_time = datetime.fromtimestamp(ut[0], timezone.utc)
+        end_time = datetime.fromtimestamp(ut[-1], timezone.utc)
+
+        cadence = np.median(np.diff(ut))
+        fps = 1 / cadence
+
+        norm = compute_norm(imgs, ut, 1)
+        frame_to_rgb = get_frame_to_rgb(cmap, norm)
+
+        # with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="libx264", quality=6) as writer:
+        # with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="h264_videotoolbox", bitrate="8M") as writer:
+        with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="libx264", quality=9) as writer:
+            video = VideoConsumer(writer, font, frame_to_rgb, height, width, imgs.dtype, ut.dtype, bin_size=1)
+
+            for n in tqdm(range(n_frames), desc=str(out_path), unit="frame"):
+                frame, frame_time = imgs[n], ut[n]
+                video.update(n, frame, frame_time)
+
+            video.finalize()
