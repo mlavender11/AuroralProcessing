@@ -1,5 +1,5 @@
 import argparse
-from auroral_processing.hist.database import get_available
+from auroral_processing.io.database import get_available
 
 
 def available_dates(): ...
