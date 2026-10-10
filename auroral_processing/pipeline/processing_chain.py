@@ -1,4 +1,8 @@
 import h5py
+from functools import partial
+from auroral_processing.utils.norm import compute_norm
+from auroral_processing.pipeline.generators import spatial_median, frame_binning_avg, normalize, to_uint16, read_h5
+from auroral_processing.pipeline.drivers import write_h5
 
 # TODO read chain from setup file
 
@@ -19,7 +23,9 @@ def chain(src, *stages):
 def apply_processing(hdf_fn):
     with h5py.File(hdf_fn, "r+") as f:
         frames = f["rawimg"]
-        vmin, vmax = get_vmin_vmax(f)  # TODO get norm
+        ut = f["ut1_unix"]
+        norm = compute_norm(frames, ut, 1)
+        vmin, vmax = norm.vmin, norm.vmax
         total_frames = len(frames)
 
         bin_size = 15
