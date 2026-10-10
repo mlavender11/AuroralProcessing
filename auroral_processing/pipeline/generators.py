@@ -1,4 +1,6 @@
 from auroral_processing.pipeline.frame_ops import apply_norm_to_frame
+import numpy as np
+from scipy.signal import wiener
 
 # Chained together to apply processing steps
 # TODO make a class for these?
@@ -114,3 +116,7 @@ def to_uint16(src, lo=0.0, hi=1.0):
         rounded = np.rint(clipped)
         int_frame = rounded.astype(np.uint16)
         yield int_frame
+
+
+def apply_wiener(src, size=None, noise=None):
+    yield wiener(src, size, noise)
