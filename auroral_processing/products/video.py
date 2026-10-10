@@ -190,17 +190,20 @@ def make_video_from_times(
         return norm
 
 
-def make_video_from_source(src_fn, out_fn=None):
+def make_video_from_source(src_fn, out_fn=None, img_dset="rawimg", ut_dset="ut1_unix"):
     """
     Make a video from a HiST HDF File
     Output is at source frame-rate, no binning or averaging
     Used for testing flow preprocessing
+
+    img_dset: Name of HDF dataset containing imgs
+    ut_dset: Name of HDF dataset containing UT tim
     """
 
     hdf_path = Path(src_fn)
 
     if not out_fn:
-        out_path = Path(out_fn).with_suffix(".mp4")
+        out_path = hdf_path.with_suffix(".mp4")
     else:
         out_path = Path(out_fn).mkdir(parents=True, exist_ok=True)
 
@@ -208,9 +211,9 @@ def make_video_from_source(src_fn, out_fn=None):
     font = get_font(size=16)
 
     with h5py.File(hdf_path, "r") as f:
-        imgs = f["rawimg"]
-        ut = f["ut1_unix"][:]
-        # imgs = f["pipeline-full"] TODO make this a parameter
+        imgs = f[img_dset]
+        ut = f[ut_dset][:]
+        # imgs = f["pipeline-full"]  # TODO make this a parameter
         # ut = f["pipeline-full-ut1_unix"]
         n_frames, height, width = imgs.shape
 
