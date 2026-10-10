@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 from tqdm.auto import tqdm
 from matplotlib.colors import LogNorm, Normalize
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from auroral_processing.utils.timing import get_start_end_idx, _assert_utc
 
@@ -105,6 +105,8 @@ def compute_norm_from_hdf(
     high_percentile=99,
     chunk_size=50,
     linear=False,
+    img_dset='rawimg',
+    ut_dset='ut1_unix'
 ):
     if start_time is not None:
         _assert_utc(start_time)
@@ -114,13 +116,13 @@ def compute_norm_from_hdf(
     hdf_path = Path(hdf_fn)
 
     with h5py.File(hdf_path, "r") as f:
-        imgs = f["rawimg"]
-        ut = f["ut1_unix"][:]
+        imgs = f[img_dset]
+        ut = f[ut_dset][:]
 
         if start_time is None:
-            start_time = datetime.fromtimestamp(ut[0], datetime.timezone.utc)
+            start_time = datetime.fromtimestamp(ut[0], timezone.utc)
         if end_time is None:
-            end_time = datetime.fromtimestamp(ut[-1], datetime.timezone.utc)
+            end_time = datetime.fromtimestamp(ut[-1], timezone.utc)
 
         start_idx, end_idx = get_start_end_idx(start_time, end_time, ut)
 
