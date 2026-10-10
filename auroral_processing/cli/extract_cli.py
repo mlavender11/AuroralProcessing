@@ -1,11 +1,11 @@
 import argparse
-from .cli_utils import hhmmss, output_options
+from .cli_utils import hhmmss #, output_options
 
-
+# parents=[output_options()],
 def add_parser(sub: argparse.ArgumentParser):
     p = sub.add_parser(
         "extract",
-        parents=[output_options()],
+        
         help="extract a time window",
         description="Copy frames between START and END (UTC) into a new HDF file",
     )  # TODO is iti nto a new file or in place?
