@@ -105,8 +105,8 @@ def compute_norm_from_hdf(
     high_percentile=99,
     chunk_size=50,
     linear=False,
-    img_dset='rawimg',
-    ut_dset='ut1_unix'
+    img_dset="rawimg",
+    ut_dset="ut1_unix",
 ):
     if start_time is not None:
         _assert_utc(start_time)
