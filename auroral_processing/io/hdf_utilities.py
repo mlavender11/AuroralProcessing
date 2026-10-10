@@ -4,7 +4,7 @@ from pathlib import Path
 import datetime
 from auroral_processing.utils.timing import get_start_end_idx
 
-# TODO Repack, explore
+# TODO explore
 FRAME_DSETS = ["rawimg", "rawind", "ut1_unix"]
 TIME_DSET = "ut1_unix"
 
@@ -138,3 +138,22 @@ def extract_clip(src_fn, start: datetime, end: datetime, out_fn=None):
         copy_datasets(src_f, out_f, start_idx=start_idx, end_idx=end_idx)
 
     return out_fn
+
+
+def repack(hdf_fn, replace=False):
+    src_fn = Path(hdf_fn)
+    tmp_fn = src_fn.with_suffix(".repacked.h5")
+
+    with h5py.File(src_fn, "r") as src, h5py.File(tmp_fn, "w") as dst:
+        for key, val in src.attrs.items():
+            dst.attrs[key] = val
+        for name in src:
+            print(f"copying {name}")
+            src.copy(name, dst)
+
+        old, new = src_fn.stat().st_size, tmp_fn.stat().st_size
+        print(f"{old/1e9:.2f} GB -> {new/1e9:.2f} GB (saved {(old-new)/1e6:.0f} MB)")
+
+        if replace:
+            tmp_fn.replace(src_fn)
+        return tmp_fn
