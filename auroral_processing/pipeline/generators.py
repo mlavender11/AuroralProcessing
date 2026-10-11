@@ -119,4 +119,5 @@ def to_uint16(src, lo=0.0, hi=1.0):
 
 
 def apply_wiener(src, size=None, noise=None):
-    yield wiener(src, size, noise)
+    for frame in src:
+        yield wiener(frame, size, noise)
