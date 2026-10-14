@@ -205,7 +205,7 @@ def make_video_from_source(src_fn, out_fn=None, img_dset="rawimg", ut_dset="ut1_
     if not out_fn:
         out_path = hdf_path.with_suffix(".mp4")
     else:
-        out_path = Path(out_fn).mkdir(parents=True, exist_ok=True)
+        out_path = hdf_path.with_name(out_fn)
 
     cmap = plt.get_cmap("gray")
     font = get_font(size=16)
