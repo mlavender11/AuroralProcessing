@@ -1,4 +1,4 @@
-from auroral_processing.pipeline.frame_ops import apply_norm_to_frame
+from auroral_processing.pipeline.frame_ops import apply_norm_to_frame, apply_spatial_median
 import numpy as np
 from scipy.signal import wiener
 
@@ -71,7 +71,7 @@ def spatial_median(src, k=3):
     """
     # TODO k > 5 for float32? Maybe use scipy?
     for frame in src:
-        yield apply_spatial_median_to_frame(frame, k)
+        yield apply_spatial_median(frame, k)
 
 
 def sliding_temporal_median(src, window=5):  # TODO need to pad edges?
