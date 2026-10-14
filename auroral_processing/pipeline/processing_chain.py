@@ -1,8 +1,17 @@
 import h5py
 from functools import partial
 from auroral_processing.utils.norm import compute_norm
-from auroral_processing.pipeline.generators import spatial_median, frame_binning_avg, normalize, to_uint16, read_h5
+from auroral_processing.pipeline.generators import (
+    spatial_median,
+    frame_binning_avg,
+    normalize,
+    to_uint16,
+    read_h5,
+    apply_wiener,
+)
 from auroral_processing.pipeline.drivers import write_h5
+from auroral_processing.io.hdf_utilities import repack
+from auroral_processing.products.video import make_video_from_source
 
 # TODO read chain from setup file
 
@@ -20,7 +29,7 @@ def chain(src, *stages):
     return src
 
 
-def apply_processing(hdf_fn):
+def apply_processing(hdf_fn, iteration):
     with h5py.File(hdf_fn, "r+") as f:
         frames = f["rawimg"]
         ut = f["ut1_unix"]
@@ -28,23 +37,33 @@ def apply_processing(hdf_fn):
         vmin, vmax = norm.vmin, norm.vmax
         total_frames = len(frames)
 
-        bin_size = 15
+        # bin_size = 15
+        # pipeline = chain(
+        #     read_h5(frames),
+        #     partial(normalize, vmin=vmin, vmax=vmax),
+        #     partial(spatial_median, k=3),
+        #     partial(frame_binning_avg, bin_size=bin_size),
+        #     to_uint16,
+        # )
+
+        bin_size = 30
         pipeline = chain(
             read_h5(frames),
             partial(normalize, vmin=vmin, vmax=vmax),
             partial(spatial_median, k=3),
             partial(frame_binning_avg, bin_size=bin_size),
+            partial(apply_wiener),
             to_uint16,
         )
 
-        n = write_h5(pipeline, f, "pipeline-full", total_frames=total_frames // bin_size, compression="lzf")
+        n = write_h5(pipeline, f, iteration, total_frames=total_frames)
         print(f"wrote {n} frames")
-        ut = f["ut1_unix"][:]
-        ut_binned = ut[: n * bin_size].reshape(n, bin_size).mean(axis=1)
+        # ut = f["ut1_unix"][:]
+        # ut_binned = ut[: n * bin_size].reshape(n, bin_size).mean(axis=1)
 
-        name = "pipeline-full-ut1_unix"
-        if name in f:
-            del f[name]
-        f.create_dataset(name, data=ut_binned)
+        # name = "pipeline-full-ut1_unix"
+        # if name in f:
+        #     del f[name]
+        # f.create_dataset(name, data=ut_binned)
 
-        f["pipeline-full"].attrs["bin_size"] = bin_size
+        # f["pipeline-full"].attrs["bin_size"] = bin_size
