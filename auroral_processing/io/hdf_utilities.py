@@ -157,3 +157,27 @@ def repack(hdf_fn, replace=False):
         if replace:
             tmp_fn.replace(src_fn)
         return tmp_fn
+
+
+def lzf_to_gzip(src, dst):
+    with h5py.File(src, "r") as fi, h5py.File(dst, "w") as fo:
+        for name, d in fi.items():
+            if d.compression != "lzf":
+                fi.copy(name, fo)  # already portable: copy unchanged
+                continue
+
+            o = fo.create_dataset(
+                name,
+                shape=d.shape,
+                dtype=d.dtype,
+                maxshape=d.maxshape,
+                chunks=d.chunks,
+                compression="gzip",
+                compression_opts=1,
+                shuffle=True,
+            )
+            for i in range(d.shape[0]):  # one frame at a time, low memory
+                o[i] = d[i]
+            for k, v in d.attrs.items():  # keep attributes like bin_size
+                o.attrs[k] = v
+            print("converted", name)
