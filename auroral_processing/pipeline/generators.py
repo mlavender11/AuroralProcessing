@@ -19,7 +19,15 @@ from scipy.signal import wiener
 
 from auroral_processing.pipeline.frame_ops import apply_norm_to_frame, apply_spatial_median
 
+STEPS = {}
 
+
+def stage(fn):
+    STEPS[fn.__name__] = fn
+    return fn
+
+
+@stage
 def read_h5(frame_dataset, time_dataset=None, block=64):
     """
     Read an HDF5 image dataset frame by frame, paired with its timestamps.
@@ -54,6 +62,7 @@ def read_h5(frame_dataset, time_dataset=None, block=64):
             yield t, frame
 
 
+@stage
 def normalize(src, vmin, vmax, curve="linear"):
     """
     Normalize each frame, see apply_norm_to_frame.
@@ -70,6 +79,7 @@ def normalize(src, vmin, vmax, curve="linear"):
         yield t, apply_norm_to_frame(frame, vmin, vmax, curve=curve)
 
 
+@stage
 def spatial_median(src, k=3):
     """
     Spatial median filter on each frame.
@@ -85,6 +95,7 @@ def spatial_median(src, k=3):
         yield t, apply_spatial_median(frame, k)
 
 
+@stage
 def sliding_temporal_median(src, window=5):
     """
     Median over a sliding window of `window` frames (odd), stamped with the
@@ -110,6 +121,7 @@ def sliding_temporal_median(src, window=5):
             yield times[k], np.partition(ring, k, axis=0)[k]
 
 
+@stage
 def frame_binning_avg(src, bin_size=15, keep_partial=False, frame_shape=None):
     """
     Average consecutive non-overlapping bins of `bin_size` frames.
@@ -150,6 +162,7 @@ def frame_binning_avg(src, bin_size=15, keep_partial=False, frame_shape=None):
         yield t_ref + (dt_sum / counter), frame_sum / counter
 
 
+@stage
 def to_uint16(src, lo=0.0, hi=1.0, out_max=255):
     """
     Map [lo, hi] -> [0, out_max], round and store as uint16.
@@ -163,6 +176,7 @@ def to_uint16(src, lo=0.0, hi=1.0, out_max=255):
         yield t, np.rint(clipped).astype(np.uint16)
 
 
+@stage
 def apply_wiener(src, size=None, noise=None):
     """Wiener filter on each frame, see scipy.signal.wiener."""
     for t, frame in src:
