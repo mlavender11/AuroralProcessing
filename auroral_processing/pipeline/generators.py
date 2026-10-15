@@ -27,38 +27,6 @@ def stage(fn):
     return fn
 
 
-def read_h5(frame_dataset, time_dataset=None, block=64):
-    """
-    Read an HDF5 image dataset frame by frame, paired with its timestamps.
-
-    Parameters
-    ----------
-    frame_dataset : h5py.Dataset
-        frames, shape (n_frames, ny, nx)
-    time_dataset : h5py.Dataset or array-like, optional
-        one timestamp per frame (e.g. ut1_unix). If None, t is the frame index.
-    block : int, optional
-        number of frames to read from disk at once, by default 64
-
-    Yields
-    ------
-    (t, frame) : (float, np.ndarray)
-    """
-    n = len(frame_dataset)
-    if time_dataset is not None and len(time_dataset) != n:
-        raise ValueError(
-            f"time dataset {time_dataset.name} has {len(time_dataset)} entries, frame dataset {frame_dataset.name} has {n}"
-        )
-
-    for start in range(0, n, block):
-        # pull a block at a time, for memory performance
-        chunk = frame_dataset[start : start + block]
-        if time_dataset is not None:
-            tchunk = np.asarray(time_dataset[start : start + block], dtype=np.float64)
-        else:
-            tchunk = np.arange(start, start + len(chunk), dtype=np.float64)
-        for t, frame in zip(tchunk, chunk):
-            yield t, frame
 
 
 @stage
