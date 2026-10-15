@@ -3,8 +3,8 @@ import copy
 import json
 import numpy as np
 from auroral_processing.utils.norm import compute_norm
-from auroral_processing.pipeline.generators import STAGES, read_h5
-from auroral_processing.pipeline.drivers import write_h5
+from auroral_processing.pipeline.drivers import write_h5, read_h5
+from auroral_processing.pipeline.stages import Stage
 
 IMAGE_ATTRS = {
     "CLASS": np.bytes_("IMAGE"),
@@ -14,56 +14,50 @@ IMAGE_ATTRS = {
     "IMAGE_WHITE_IS_ZERO": np.uint8(0),
 }
 
+def build_stages(chain):
+    """Accepts Stage objects, dicts, or a mix"""
+    return [copy.deepcopy(s) if isinstance(s, Stage) else Stage.from_dict(s) for s in chain]
 
-def build_chain(src, chain_dict):
-    """
-    Chain processing stages together.
 
-    src is the original source (e.g. ``read_h5``); each stage takes the previous
-    stage as its source. Every stage passes ``(t, frame)`` pairs, so time follows
-    the frames through binning etc. Pull from the returned generator (with a
-    driver from ``drivers.py``) to run the chain.
-
-    ``chain_dict`` is a dictionary containing each step and its settings
-
-    Example:
-    ```chain_dict = {
-        "normalize": {"vmin": norm.vmin, "vmax": norm.vmax}, #TODO does norm.vmin work here
-        "spatial_median": {"k": 3},
-        "frame_binning_avg": {"bin_size": 15},
-        "apply_wiener": {},
-        "to_uint16": {},
-    }
-    ```
-    """
-
-    for step, settings in chain_dict.items():
-        src = STAGES[step](src, **settings)
-
+def connect_stages(stages, src):
+    """Needs a driver at the end - e.g. write_h5"""
+    for stage in stages:
+        src = stage.run(src)
     return src
 
-
-def resolve(chain_dict, values):
-    "Copy chain dict, replacing values such as $name with values[name]"
-    "e.x. values[vmin] = norm.vmin, so $vmin becomes norm.vmin"
-    chain_dict = copy.deepcopy(chain_dict)
-    for settings in chain_dict.values():
-        for key, val in settings.items():
-            if isinstance(val, str) and val.startswith("$"):
-                settings[key] = values[val[1:]]
-    return chain_dict
-
-
-def num_output_frames(n_frames, chain_dict):
-    """Number of frames the chain outputs from n_frames input frames."""
-    n = n_frames
-    for stage, settings in chain_dict.items():
-        if stage == "frame_binning_avg":
-            n //= settings.get("bin_size", 15)
-        elif stage == "sliding_temporal_median":
-            n -= settings.get("window", 5) - 1
+def num_output_frames(stages, n):
+    for stage in stages:
+        n = stage.n_out(n)
     return n
 
+def fit_stages(stages, frames, times):
+    """Calculate needed values for each stage, e.g. norm for normalize"""
+    for i, stage in enumerate(stages):
+        if type(stage).fit is Stage.fit: # TODO what if we didn't have this line?
+            continue
+        else: # TODO have it fit on the output of the previous stage
+            stage.fit(frames, times)
+    # TODO need return stages?
+
+
+def apply_processing(hdf_fn, chain, iteration, frames_name='rawimg', times_name='ut1_unix'):
+    stages = build_stages(chain)
+
+    with h5py.File(hdf_fn, 'r+') as f:
+        frames = f[frames_name]
+        ut = f[times_name]
+        fit_stages(stages, frames, ut)
+
+        n = write_h5(
+            connect_stages(stages, read_h5(frames, ut)),
+            f,
+            iteration,
+            total_frames=num_output_frames(stages, len(frames))
+        )
+
+        write_attrs(f, frames_name, times_name, iteration, f'{iteration}_ut1_unix',
+                    [s.to_dict() for s in stages])
+    
 
 def write_attrs(f, src_frame_name, src_ut_name, dest_frame_name, dest_ut_name, chain_dict):
     dest_imgs = f[dest_frame_name]
@@ -87,29 +81,3 @@ def write_attrs(f, src_frame_name, src_ut_name, dest_frame_name, dest_ut_name, c
 
     for key, val in IMAGE_ATTRS.items():
         dest_imgs.attrs[key] = val
-
-
-def apply_processing(hdf_fn, chain_dict, iteration, frames_name="rawimg", time_name="ut1_unix"):
-    """
-    Run the processing chain on `frames_name` and write the result to
-    `iteration`, with its own time dataset f"{iteration}_ut1_unix".
-    """
-    with h5py.File(hdf_fn, "r+") as f:
-        frames = f[frames_name]
-        ut = f[time_name]
-
-        norm = compute_norm(frames, ut, 1)
-        chain = resolve(chain_dict, {"vmin": norm.vmin, "vmax": norm.vmax})
-
-        pipeline = build_chain(read_h5(frames, ut), chain)
-
-        n = write_h5(
-            pipeline,
-            f,
-            iteration,
-            total_frames=num_output_frames(len(frames), chain),
-        )
-
-        write_attrs(f, frames_name, time_name, iteration, f"{iteration}_ut1_unix", chain)
-        print(f"wrote {n} frames to /{iteration}, times to /{f[iteration].attrs['time_dataset']}")
-        return n
