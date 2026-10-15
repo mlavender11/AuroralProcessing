@@ -102,22 +102,44 @@ def sliding_temporal_median(src, window=5):  # TODO need to pad edges?
             yield np.partition(ring, k, axis=0)[k]
 
 
-def frame_binning_avg(src, bin_size=15, frame_shape=(512, 512)):
-    counter = 0
-    frame_sum = None
-    for frame in src:
-        if frame_sum is None:
-            frame_sum = np.zeros(frame_shape, dtype=np.float64)
+def frame_binning_avg(src, bin_size=15, keep_partial=False, frame_shape=None):
+    """
+    Average consecutive non-overlapping bins of `bin_size` frames.
 
-        # Accumulate frames, continue until bin is full
+    The output time is the mean of the bin's input times (the bin centre for
+    a regular cadence), so frame-to-frame dt of the output is bin_size times
+    the input cadence.
+
+    Parameters
+    ----------
+    src : iterable of (t, frame)
+    bin_size : int
+        frames per bin
+    keep_partial : bool, optional
+        also yield a final, shorter bin if frames are left over; by default
+        they are dropped (output has n // bin_size frames)
+    frame_shape : ignored
+        kept for backwards compatibility; the shape is taken from the frames
+    """
+    frame_sum = None
+    t_ref, dt_sum, counter = 0.0, 0.0, 0
+    for t, frame in src:
+        if frame_sum is None:
+            frame_sum = np.zeros(frame.shape, dtype=np.float64)
+            t_ref = t  # sum offsets from the bin's first time, to keep precision
+
+        # accumulate frames until the bin is full
         frame_sum += frame
+        dt_sum += t - t_ref
         counter += 1
 
-        # if bin is full, average together and reset
+        # bin full: average together and reset
         if counter == bin_size:
-            frame_avg = frame_sum / bin_size
-            yield frame_avg
-            frame_sum, counter = None, 0
+            yield t_ref + (dt_sum / bin_size), frame_sum / bin_size
+            frame_sum, dt_sum, counter = None, 0.0, 0
+
+    if keep_partial and counter:
+        yield t_ref + (dt_sum / counter), frame_sum / counter
 
 
 def to_uint16(src, lo=0.0, hi=1.0, out_max=255):
