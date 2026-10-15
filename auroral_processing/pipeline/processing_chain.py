@@ -15,12 +15,14 @@ from auroral_processing.pipeline.drivers import write_h5
 
 
 def chain(src, *stages):
-    # Chain together processing stage generators
-    # src should be hdf reader or other
-    # Intermediate stages apply affects
-    # Final stage is a driver from drivers.py
-    # src is the original source,
-    # the source of each stage is the prior stage
+    """
+    Chain processing stages together.
+
+    src is the original source (e.g. read_h5); each stage takes the previous
+    stage as its source. Every stage passes (t, frame) pairs, so time follows
+    the frames through binning etc. Pull from the returned generator (with a
+    driver from drivers.py) to run the chain.
+    """
     for stage in stages:
         src = stage(src)
     # return the final stage, pull from it to operate the chain
