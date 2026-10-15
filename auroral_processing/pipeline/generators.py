@@ -1,9 +1,23 @@
-from auroral_processing.pipeline.frame_ops import apply_norm_to_frame, apply_spatial_median
+"""
+Processing stages, chained together with processing_chain.chain().
+
+Every stage takes and yields (t, frame) pairs, so each frame carries its own
+timestamp through the chain and the time dataset written at the end always
+matches the frames:
+
+  - per-frame stages (normalize, spatial_median, apply_wiener, to_uint16)
+    pass t through unchanged
+  - frame_binning_avg     -> mean time of the frames in the bin (bin centre)
+  - sliding_temporal_median -> time of the centre frame of the window
+
+"""
+
+from collections import deque
+
 import numpy as np
 from scipy.signal import wiener
 
-# Chained together to apply processing steps
-# TODO make a class for these?
+from auroral_processing.pipeline.frame_ops import apply_norm_to_frame, apply_spatial_median
 
 
 def read_h5(frame_dataset, time_dataset=None, block=64):
