@@ -168,6 +168,18 @@ class H5Source:
                              "expected (n, ny, nx) or (n, ny, nx, channels)")
         self.n = self.ds.shape[self.axis]
 
+        # pipeline outputs record their time dataset (and its scale) in attributes
+        if not time and "time_dataset" in self.ds.attrs:
+            time = self.ds.attrs["time_dataset"]
+            time = time.decode() if isinstance(time, bytes) else str(time)
+            if time not in self.f:
+                time = None
+            else:
+                print(f"using time dataset /{time} (from {images} attrs)")
+        if time and not unix and "time_scale" in self.f[time].attrs:
+            unix = self.f[time].attrs["time_scale"]
+            unix = unix.decode() if isinstance(unix, bytes) else str(unix)
+
         self.t_utc0 = None                   # absolute time of frame 0, if known
         self.scale_name = unix or "UTC"      # what the clock labels are called
         if time:
