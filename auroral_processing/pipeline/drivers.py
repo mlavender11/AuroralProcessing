@@ -97,7 +97,7 @@ def write_h5(
             times.resize(new_size, axis=0)
 
         imgs[i] = frame
-        times[t] = t
+        times[i] = t
         i += 1
 
     # trim to the frames actually written
