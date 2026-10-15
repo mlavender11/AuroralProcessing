@@ -41,7 +41,6 @@ def apply_processing(hdf_fn, iteration, frames_name="rawimg", time_name="ut1_uni
         vmin, vmax = norm.vmin, norm.vmax
         total_frames = len(frames)
 
-        # bin_size = 15
         # pipeline = chain(
         #     read_h5(frames, ut),
         #     partial(normalize, vmin=vmin, vmax=vmax),
@@ -60,14 +59,23 @@ def apply_processing(hdf_fn, iteration, frames_name="rawimg", time_name="ut1_uni
             to_uint16,
         )
 
-        n = write_h5(pipeline, f, iteration, total_frames=total_frames)
-        print(f"wrote {n} frames")
-        # ut = f["ut1_unix"][:]
-        # ut_binned = ut[: n * bin_size].reshape(n, bin_size).mean(axis=1)
+        stages = (  # TODO UPDATE TO DO AUTO FROM ABOVE CHAIN
+            f"normalize(vmin={vmin:.6g}, vmax={vmax:.6g}) -> spatial_median(k=3) "
+            f"-> frame_binning_avg({bin_size}) -> wiener -> to_uint16"
+        )
 
-        # name = "pipeline-full-ut1_unix"
-        # if name in f:
-        #     del f[name]
-        # f.create_dataset(name, data=ut_binned)
+        time_attrs = dict(ut.attrs)
+        time_attrs.update(
+            units="seconds since 1970-01-01",
+            time_scale="UT1",
+            source_dataset=time_name,
+        )
 
-        # f["pipeline-full"].attrs["bin_size"] = bin_size
+        n = write_h5(pipeline, f, iteration, total_frames=len(frames) // bin_size, time_attrs=time_attrs)
+
+        img = f[iteration]
+        img.attrs["source_dataset"] = frames_name
+        img.attrs["bin_size"] = bin_size
+        img.attrs["stages"] = stages
+        print(f"wrote {n} frames to /{iteration}, times to /{img.attrs['time_dataset']}")
+        return n
