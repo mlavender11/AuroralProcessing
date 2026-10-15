@@ -27,7 +27,6 @@ def stage(fn):
     return fn
 
 
-@stage
 def read_h5(frame_dataset, time_dataset=None, block=64):
     """
     Read an HDF5 image dataset frame by frame, paired with its timestamps.
