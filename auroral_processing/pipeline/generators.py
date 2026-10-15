@@ -39,7 +39,9 @@ def read_h5(frame_dataset, time_dataset=None, block=64):
     """
     n = len(frame_dataset)
     if time_dataset is not None and len(time_dataset) != n:
-        raise ValueError(f"time dataset {time_dataset.name} has {len(time_dataset)} entries, frame dataset {frame_dataset.name} has {n}")
+        raise ValueError(
+            f"time dataset {time_dataset.name} has {len(time_dataset)} entries, frame dataset {frame_dataset.name} has {n}"
+        )
 
     for start in range(0, n, block):
         # pull a block at a time, for memory performance
@@ -50,8 +52,6 @@ def read_h5(frame_dataset, time_dataset=None, block=64):
             tchunk = np.arange(start, start + len(chunk), dtype=np.float64)
         for t, frame in zip(tchunk, chunk):
             yield t, frame
-
-
 
 
 def normalize(src, vmin, vmax, curve="linear"):
