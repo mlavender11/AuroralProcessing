@@ -6,72 +6,69 @@ from scipy.signal import wiener
 # TODO make a class for these?
 
 
-def read_h5(frame_dataset, block=64):
-    # TODO read time ?
+def read_h5(frame_dataset, time_dataset=None, block=64):
     """
-    read in HDF5 file frame by frame
-    reads frams from HDF5 in blocks
+    Read an HDF5 image dataset frame by frame, paired with its timestamps.
 
     Parameters
     ----------
-    frame_dataset :
-        dataset within HDF5 file containing frames
+    frame_dataset : h5py.Dataset
+        frames, shape (n_frames, ny, nx)
+    time_dataset : h5py.Dataset or array-like, optional
+        one timestamp per frame (e.g. ut1_unix). If None, t is the frame index.
     block : int, optional
-        number of frames to read from drive at once, by default 64
+        number of frames to read from disk at once, by default 64
 
     Yields
     ------
-    individual frames
+    (t, frame) : (float, np.ndarray)
     """
-    for start in range(0, len(frame_dataset), block):
-        # pull of size chunk, for memory performance
+    n = len(frame_dataset)
+    if time_dataset is not None and len(time_dataset) != n:
+        raise ValueError(f"time dataset {time_dataset.name} has {len(time_dataset)} entries, frame dataset {frame_dataset.name} has {n}")
+
+    for start in range(0, n, block):
+        # pull a block at a time, for memory performance
         chunk = frame_dataset[start : start + block]
-        for frame in chunk:
-            yield frame
+        if time_dataset is not None:
+            tchunk = np.asarray(time_dataset[start : start + block], dtype=np.float64)
+        else:
+            tchunk = np.arange(start, start + len(chunk), dtype=np.float64)
+        for t, frame in zip(tchunk, chunk):
+            yield t, frame
+
+
 
 
 def normalize(src, vmin, vmax, curve="linear"):
     """
-    apply normalize to sequence of frames, pulled from an iterable
+    Normalize each frame, see apply_norm_to_frame.
 
     Parameters
     ----------
-    src : iterable
-        iterable containing frames, intended to be np.ndarray
-    vmin : float
-        vmin value used for normalization
-    vmax : float
-        vmax value used for normalization
+    src : iterable of (t, frame)
+    vmin, vmax : float
+        normalization limits
     curve : str, optional
         curve type, see apply_norm_to_frame, by default "linear"
-
-    Yields
-    ------
-    individual frame
     """
-    for frame in src:
-        yield apply_norm_to_frame(frame, vmin, vmax, curve=curve)
+    for t, frame in src:
+        yield t, apply_norm_to_frame(frame, vmin, vmax, curve=curve)
 
 
 def spatial_median(src, k=3):
-    # TODO use cv2.spatial median directly?
     """
-    apply spatial median to a sequence of frames, pulled from an iterable
+    Spatial median filter on each frame.
 
     Parameters
     ----------
-    src : iterable
-        iterable containing frames, intended to be np.ndarray
+    src : iterable of (t, frame)
     k : int, optional
-        kernel size for median, must be odd, by default 3
-
-    Yields
-    ------
-    individual frame
+        kernel size, must be odd, by default 3
     """
     # TODO k > 5 for float32? Maybe use scipy?
-    for frame in src:
-        yield apply_spatial_median(frame, k)
+    for t, frame in src:
+        yield t, apply_spatial_median(frame, k)
 
 
 def sliding_temporal_median(src, window=5):  # TODO need to pad edges?
@@ -123,5 +120,6 @@ def to_uint16(src, lo=0.0, hi=1.0, out_max=255):
 
 
 def apply_wiener(src, size=None, noise=None):
-    for frame in src:
-        yield wiener(frame, size, noise)
+    """Wiener filter on each frame, see scipy.signal.wiener."""
+    for t, frame in src:
+        yield t, wiener(frame, size, noise)
