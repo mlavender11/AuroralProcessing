@@ -97,4 +97,4 @@ def apply_temporal_median(frame_stack):
     np.ndarray
         frame the same size as input
     """
-    return np.median(frame_stack, axis=2)
+    return np.median(frame_stack, axis=0)
