@@ -2,14 +2,30 @@ from auroral_processing.pipeline.processing_chain import apply_processing
 from auroral_processing.products.video import make_video_from_source
 from auroral_processing.io.hdf_utilities import repack
 
+
+def validate_chain():
+    ...
+    # TODO implement
+
+
 # fn = "/Users/michaellavender/Developer/AuroralProcessing/optical_flow/data/2013-03-27-CamSer7196_015400-015600.h5"
 fn = "/Users/michaellavender/Developer/AuroralProcessing/optical_flow/data/2013-03-27-CamSer7196_015400-015600-copy.h5"
 
 iteration = "v1"
 
+
 if __name__ == "__main__":
+
+    chain = {
+        "normalize": {"vmin": "$vmin", "vmax": "$vmax"},
+        "spatial_median": {"k": 3},
+        "frame_binning_avg": {"bin_size": 15},
+        "apply_wiener": {},
+        "to_uint16": {},
+    }
+
     print("proc")
-    apply_processing(fn, iteration)
+    apply_processing(fn, chain_dict=chain, iteration=iteration)
     print("repack")
     repack(fn, replace=True)  # reclaims space from deleted/overwritten datasets
     print("video")
