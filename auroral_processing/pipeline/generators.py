@@ -19,11 +19,11 @@ from scipy.signal import wiener
 
 from auroral_processing.pipeline.frame_ops import apply_norm_to_frame, apply_spatial_median
 
-STEPS = {}
+STAGES = {}
 
 
 def stage(fn):
-    STEPS[fn.__name__] = fn
+    STAGES[fn.__name__] = fn
     return fn
 
 
