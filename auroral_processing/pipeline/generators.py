@@ -85,21 +85,29 @@ def spatial_median(src, k=3):
         yield t, apply_spatial_median(frame, k)
 
 
-def sliding_temporal_median(src, window=5):  # TODO need to pad edges?
-    # Must window be odd?
+def sliding_temporal_median(src, window=5):
+    """
+    Median over a sliding window of `window` frames (odd), stamped with the
+    centre frame's time. The first and last window//2 frames have no full
+    window and are dropped, so the output has n - window + 1 frames.
+    """
     if window % 2 == 0:
         raise ValueError(f"window must be odd: current window size = {window}")
 
     k = window // 2
-    ring, n = None, 0
-    for frame in src:
-        if ring is None:  # Why not do this above?
+    ring = None
+    times = deque(maxlen=window)  # oldest first, so times[k] is the center
+    n = 0
+    for t, frame in src:
+        if ring is None:  # allocate once the frame shape is known
             ring = np.empty((window,) + frame.shape, dtype=np.float32)
 
-        ring[n % window] = frame  # why this and not overwrite n?
+        # ring buffer: overwrite the oldest slot; order doesn't matter for a median
+        ring[n % window] = frame
+        times.append(t)
         n += 1
         if n >= window:
-            yield np.partition(ring, k, axis=0)[k]
+            yield times[k], np.partition(ring, k, axis=0)[k]
 
 
 def frame_binning_avg(src, bin_size=15, keep_partial=False, frame_shape=None):
