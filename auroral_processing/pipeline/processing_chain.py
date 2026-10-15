@@ -29,30 +29,34 @@ def chain(src, *stages):
     return src
 
 
-def apply_processing(hdf_fn, iteration):
+def apply_processing(hdf_fn, iteration, frames_name="rawimg", time_name="ut1_unix"):
+    """
+    Run the processing chain on `frames_name` and write the result to
+    `iteration`, with its own time dataset f"{iteration}_ut1_unix".
+    """
     with h5py.File(hdf_fn, "r+") as f:
-        frames = f["rawimg"]
-        ut = f["ut1_unix"]
+        frames = f[frames_name]
+        ut = f[time_name]
         norm = compute_norm(frames, ut, 1)
         vmin, vmax = norm.vmin, norm.vmax
         total_frames = len(frames)
 
         # bin_size = 15
         # pipeline = chain(
-        #     read_h5(frames),
+        #     read_h5(frames, ut),
         #     partial(normalize, vmin=vmin, vmax=vmax),
         #     partial(spatial_median, k=3),
         #     partial(frame_binning_avg, bin_size=bin_size),
+        #     apply_wiener,
         #     to_uint16,
         # )
-
-        bin_size = 30
+        bin_size = 15
         pipeline = chain(
-            read_h5(frames),
-            partial(normalize, vmin=vmin, vmax=vmax),
+            read_h5(frames, ut),
+            # partial(normalize, vmin=vmin, vmax=vmax),
             partial(spatial_median, k=3),
             partial(frame_binning_avg, bin_size=bin_size),
-            partial(apply_wiener),
+            apply_wiener,
             to_uint16,
         )
 
