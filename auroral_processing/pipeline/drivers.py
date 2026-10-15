@@ -44,8 +44,6 @@ def write_h5(
         time dataset to write, by default f"{dataset_name}_ut1_unix"
     time_attrs : dict, optional
         attributes for the time dataset (e.g. copied from the source time dataset)
-    block : int, optional
-        frames buffered per write, by default 64
 
     Returns
     -------
@@ -62,15 +60,16 @@ def write_h5(
         if name in f:
             del f[name]  # TODO implement protections
 
-    dataset = times = None
+    imgs = times = None
     i = 0
 
     for t, frame in tqdm(src, total=total_frames):
-        if dataset is None:
+        if imgs is None:
             frame_shape = frame.shape
-            dataset = f.create_dataset(
+            initial_len = total_frames or 1024
+            imgs = f.create_dataset(
                 dataset_name,
-                shape=(total_frames,) + frame_shape,
+                shape=(initial_len,) + frame_shape,
                 maxshape=(None,) + frame_shape,  # resizable
                 dtype=dtype,
                 chunks=(1,) + frame_shape,
@@ -80,23 +79,30 @@ def write_h5(
             )
             times = f.create_dataset(
                 time_name,
-                shape=(total_frames,),
+                shape=(initial_len,),
                 maxshape=(None,),
                 dtype=np.float64,
             )
             if image_attrs:
                 for key, val in IMAGE_ATTRS.items():
-                    dataset.attrs[key] = val
-            dataset.attrs["time_dataset"] = time_name
+                    imgs.attrs[key] = val
+            imgs.attrs["time_dataset"] = time_name
             times.attrs["frames_dataset"] = dataset_name
             for key, val in (time_attrs or {}).items():
                 times.attrs[key] = val
-        dataset[i] = frame
+
+        if i == imgs.shape[0]:
+            new_size = 2 * i
+            imgs.resize(new_size, axis=0)
+            times.resize(new_size, axis=0)
+
+        imgs[i] = frame
+        times[t] = t
         i += 1
 
     # trim to the frames actually written
-    if dataset is not None and dataset.shape[0] != i:
-        dataset.resize(i, axis=0)
+    if imgs is not None and imgs.shape[0] != i:
+        imgs.resize(i, axis=0)
         times.resize(i, axis=0)
 
     return i
