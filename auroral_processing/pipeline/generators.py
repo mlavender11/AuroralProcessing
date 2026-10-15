@@ -109,13 +109,17 @@ def frame_binning_avg(src, bin_size=15, frame_shape=(512, 512)):
             frame_sum, counter = None, 0
 
 
-def to_uint16(src, lo=0.0, hi=1.0):
-    scale = 255.0 / (hi - lo)
-    for frame in src:
-        clipped = np.clip((frame - lo) * scale, 0, 255)
-        rounded = np.rint(clipped)
-        int_frame = rounded.astype(np.uint16)
-        yield int_frame
+def to_uint16(src, lo=0.0, hi=1.0, out_max=255):
+    """
+    Map [lo, hi] -> [0, out_max], round and store as uint16.
+
+    out_max defaults to 255 to match the previous behaviour; use 65535 for the
+    full uint16 range.
+    """
+    scale = out_max / (hi - lo)
+    for t, frame in src:
+        clipped = np.clip((frame - lo) * scale, 0, out_max)
+        yield t, np.rint(clipped).astype(np.uint16)
 
 
 def apply_wiener(src, size=None, noise=None):
