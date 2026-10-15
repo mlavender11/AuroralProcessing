@@ -1,16 +1,8 @@
-import h5py
 import numpy as np
 from tqdm.auto import tqdm
 
-IMAGE_ATTRS = {
-    "CLASS": np.bytes_("IMAGE"),
-    "IMAGE_VERSION": np.bytes_("1.2"),
-    "IMAGE_SUBCLASS": np.bytes_("IMAGE_GRAYSCALE"),
-    "DISPLAY_ORIGIN": np.bytes_("UL"),
-    "IMAGE_WHITE_IS_ZERO": np.uint8(0),
-}
 
-
+# TODO write pipeline specs to imgs attrs
 # driver - used to pull from the end of a chain of generator stages
 def write_h5(
     src,
@@ -18,12 +10,10 @@ def write_h5(
     dataset_name,
     total_frames=None,
     time_name=None,
-    time_attrs=None,
     dtype=np.uint16,
     compression="gzip",
     compression_opts=1,
     shuffle=True,
-    image_attrs=True,
 ):
     """
     Drain a chain of (t, frame) stages into an image dataset plus a matching
@@ -83,13 +73,6 @@ def write_h5(
                 maxshape=(None,),
                 dtype=np.float64,
             )
-            if image_attrs:
-                for key, val in IMAGE_ATTRS.items():
-                    imgs.attrs[key] = val
-            imgs.attrs["time_dataset"] = time_name
-            times.attrs["frames_dataset"] = dataset_name
-            for key, val in (time_attrs or {}).items():
-                times.attrs[key] = val
 
         if i == imgs.shape[0]:
             new_size = 2 * i
