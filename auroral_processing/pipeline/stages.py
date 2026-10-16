@@ -1,10 +1,11 @@
+from __future__ import annotations
 from abc import abstractmethod, ABC
 from typing import Any, ClassVar, Iterable, Iterator
-from __future__ import annotations
 from dataclasses import dataclass, asdict, fields
 from auroral_processing.utils.norm import compute_norm
 import numpy as np
 from collections import deque
+import cv2
 from scipy.signal import wiener
 
 Stream = Iterable[tuple[float, np.ndarray]]
@@ -18,7 +19,7 @@ class Stage(ABC):
     name: ClassVar[str]
 
     def __init_subclass__(cls, **kwargs):
-        return super().__init_subclass__(**kwargs)
+        super().__init_subclass__(**kwargs)
         STAGES[cls.name] = cls
 
     def fit(self, frames, times) -> Stage:
@@ -75,9 +76,14 @@ class Normalize(Stage):
         if self.curve not in ("linear", "log", "sqrt"):  # TODO can I make this a class constant list
             raise ValueError(f"curve must be linear, log, or swrt, not {self.curve!r}")
 
-    def apply_norm_to_frame():
-        ...  # TODO implement
-        # TODO should this be a static or class method?
+    def apply_norm_to_frame(self, frame):
+        frame = np.clip(frame, self.vmin, self.vmax).astype(np.float32)
+        if self.curve == "linear":
+            return (frame - self.vmin) / (self.vmax - self.vmin)
+        elif self.curve == "log":
+            return (np.log(frame) - np.log(self.vmin)) / (np.log(self.vmax) - np.log(self.vmin))
+        elif self.curve == "sqrt":
+            return (np.sqrt(frame) - np.sqrt(self.vmin)) / (np.sqrt(self.vmax) - np.sqrt(self.vmin))
 
     def fit(self, frames, times):
         if self.vmin is None or self.vmax is None:
@@ -96,7 +102,7 @@ class Normalize(Stage):
 
 
 @dataclass
-def SpatialMedian(Stage):
+class SpatialMedian(Stage):
     name = "spatial_median"
     k: int = 3
 
@@ -106,7 +112,7 @@ def SpatialMedian(Stage):
 
     def run(self, src):
         for t, frame in src:
-            ...  # TODO move apply_spatial_median to here
+            yield t, cv2.medianBlur(frame, self.k)
 
 
 @dataclass
@@ -131,12 +137,13 @@ class SlidingTemporalMedian(Stage):
 
             ring[n % self.window] = frame  # TODO n or n-1?
             times.append(t)
-            if n >= self.window -1:
+            if n >= self.window - 1:
                 yield times[k], np.partition(ring, k, axis=0)[k]
 
 
 @dataclass
 class BinnedTemporalAverage(Stage):
+    name = "binned_temporal_average"
     bin_size: int = 15
 
     def __post_init__(self):
@@ -184,7 +191,7 @@ class ToUint16(Stage):
     out_max: int = 255
 
     def __post_init__(self):
-        if self.hi <= self.low:
+        if self.high <= self.low:
             raise ValueError(f"high: {self.high} must be greater than low: {self.low}")
 
     def run(self, src):
