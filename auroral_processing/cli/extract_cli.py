@@ -11,8 +11,8 @@ def add_parser(sub: argparse.ArgumentParser):
     )  # TODO is iti nto a new file or in place?
 
     p.add_argument("filename", help="input HiST HDF5 file")
-    p.add_argment("start", type=hhmmss, help="start time, HH:MM:SS UTC")
-    p.add_argment("end", type=hhmmss, help="end time, HH:MM:SS UTC")
+    p.add_argument("start", type=hhmmss, help="start time, HH:MM:SS UTC")
+    p.add_argument("end", type=hhmmss, help="end time, HH:MM:SS UTC")
     # TODO any others?
     p.set_defaults(func=run)
 

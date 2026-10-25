@@ -1,7 +1,7 @@
 import argparse
-from . import video_cli, extract_cli, processing_cli
+from . import video_cli, extract_cli, processing_cli, flow_cli
 
-COMMANDS = [video_cli, extract_cli, processing_cli]
+COMMANDS = [video_cli, extract_cli, processing_cli, flow_cli]
 
 
 def build_parser():
