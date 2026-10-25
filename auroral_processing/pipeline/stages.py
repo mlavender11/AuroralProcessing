@@ -112,7 +112,7 @@ class SpatialMedian(Stage):
 
     def run(self, src):
         for t, frame in src:
-            yield t, cv2.medianBlur(frame, self.k)
+            yield t, cv2.medianBlur(frame.astype(np.float32), self.k)
 
 
 @dataclass
