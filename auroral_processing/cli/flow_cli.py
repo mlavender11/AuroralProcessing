@@ -65,6 +65,28 @@ def add_parser(sub):
     _add_video_options(s)
     s.set_defaults(func=run_sweep)
 
+    # ---- aurora flow score ----
+    sc = flow_sub.add_parser("score", help="score the runs of a sweep (scores.csv + heatmaps)")
+    sc.add_argument("sweep_dir", help="folder from 'aurora flow sweep'")
+    sc.add_argument("--source", default=None, help="source file, if it has moved since the sweep ran")
+    sc.add_argument("--no-plot", action="store_true", help="skip scores_heatmaps.png")
+    sc.set_defaults(func=run_score)
+
+    # ---- aurora flow benchmark ----
+    b = flow_sub.add_parser("benchmark", help="build a synthetic benchmark with known flow from real frames")
+    b.add_argument("filename", help="source HDF5 file")
+    b.add_argument("-o", "--out", required=True, help="benchmark file to write")
+    b.add_argument("--frames", default="v4", help="frame dataset to build from (default v4)")
+    b.add_argument("--base-frames", type=int, nargs="+", default=None,
+                   help="source frames to build from (default: the 4 with the most lane structure)")
+    b.add_argument("--speeds", type=float, nargs="+", default=[5, 15, 25], help="rigid lane speeds, px/pair")
+    b.add_argument("--realistic-flow", default=None, help="flow file of the same frames, used (smoothed) as an extra case")
+    b.add_argument("--brightness", type=float, nargs=2, default=[0.05, 0.15], metavar=("MIN", "MAX"),
+                   help="fractional brightness change of still patches (0 0 for none)")
+    b.add_argument("--seed", type=int, default=0)
+    b.add_argument("--overwrite", action="store_true", help="replace an existing benchmark")
+    b.set_defaults(func=run_benchmark)
+
 
 def _add_video_options(p):
     g = p.add_argument_group("video options")
@@ -144,3 +166,25 @@ def run_sweep(args):
         **_compute_kw(args),
     )
     print(summary)
+
+
+def run_score(args):
+    from auroral_processing.flow.score import score_sweep
+
+    print(score_sweep(args.sweep_dir, source=args.source, plot=not args.no_plot))
+
+
+def run_benchmark(args):
+    from auroral_processing.flow.benchmark import make_benchmark
+
+    print(make_benchmark(
+        args.filename,
+        args.out,
+        frames=args.frames,
+        base_frames=args.base_frames,
+        speeds=args.speeds,
+        realistic_flow=args.realistic_flow,
+        brightness=tuple(args.brightness) if max(args.brightness) > 0 else None,
+        seed=args.seed,
+        overwrite=args.overwrite,
+    ))
