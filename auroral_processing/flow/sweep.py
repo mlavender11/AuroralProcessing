@@ -9,7 +9,7 @@ from auroral_processing.flow.compute_flow import compute_flow
 from auroral_processing.flow.params import TVL1Params, external_name
 from auroral_processing.flow.io import open_flow
 
-PAIRING = ("gap",)  # grid settings that change the frame pairs rather than TV-L1
+PAIRING = ("gap", "stride")  # grid settings that change the frame pairs rather than TV-L1
 
 
 def run_name(settings: dict) -> str:
@@ -52,8 +52,9 @@ def run_sweep(
         Source HDF5 file.
     grid : dict[str, list]
         TV-L1 setting name -> values to try, e.g. ``{"gamma": [1, 3], "lambda": [0.05, 0.15, 0.4]}``.
-        May also include ``"gap"``. All gaps then use the same first frames: ``stride`` defaults to
-        the largest gap and ``stop`` is shortened per gap, so every run has the same pairs' i0. A
+        May also include ``"gap"`` and ``"stride"``. Swept gaps all use the same first frames:
+        ``stride`` defaults to the largest gap and ``stop`` is shortened per gap, so runs with the
+        same stride have the same pairs' i0. A
         ``video_kw`` ``vmax`` is then for the ``gap`` in ``compute_kw`` (default 1) and is scaled
         with the gap (and ``arrow_scale`` inversely), so colours and arrows mean the same px/s.
     outdir : str or pathlib.Path
@@ -92,6 +93,8 @@ def run_sweep(
         settings = dict(zip(names, values))
         params = base_params.replace(**{k: v for k, v in settings.items() if k not in PAIRING})
         kw, vkw = dict(compute_kw), dict(video_kw or {})
+        if "stride" in settings:
+            kw["stride"] = int(settings["stride"])
         if gaps:
             gap = kw["gap"] = int(settings["gap"])
             kw["stop"] = stop - max(gaps) + gap
@@ -112,7 +115,7 @@ def run_sweep(
                 make_flow_video(flow_path, partial, kind=kind, progress=progress, **vkw)
                 partial.rename(video)
 
-        rows.append({"run": run_dir.name, "gap": kw.get("gap", 1), **params.to_dict(), **summarise(flow_path)})
+        rows.append({"run": run_dir.name, "gap": kw.get("gap", 1), "stride": kw.get("stride") or kw.get("gap", 1), **params.to_dict(), **summarise(flow_path)})
 
     summary = outdir / "summary.csv"
     pd.DataFrame(rows).to_csv(summary, index=False)

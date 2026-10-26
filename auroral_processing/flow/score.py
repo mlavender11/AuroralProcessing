@@ -215,7 +215,7 @@ def _runs(sweep_dir):
             continue
         with open_flow(path) as f:
             cfg = read_config(f)
-            out.append((name, path, {"gap": cfg["gap"], **cfg["tvl1"]}))
+            out.append((name, path, {"gap": cfg["gap"], "stride": cfg["stride"], **cfg["tvl1"]}))
     if not out:
         raise FileNotFoundError(f"no <run>/flow.h5 in {sweep_dir}")
     return out
@@ -272,7 +272,7 @@ def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
 
 
 def varied_settings(df) -> list[str]:
-    names = ["gap"] + [external_name(n) for n in TVL1Params.__dataclass_fields__]
+    names = ["gap", "stride"] + [external_name(n) for n in TVL1Params.__dataclass_fields__]
     return [n for n in names if n in df and df[n].nunique() > 1]
 
 
@@ -291,7 +291,7 @@ def plot_scores(df, out, title=""):
     if "epe_lane" in df:
         panels = TRUTH_PANELS
     else:
-        panels = GAP_PANELS if "gap" in varied else REAL_PANELS
+        panels = GAP_PANELS if {"gap", "stride"} & set(varied) else REAL_PANELS
     panels = [p for p in panels if p[0] in df]
     cols = 3 if len(panels) > 4 else len(panels)
     rows = -(-len(panels) // cols)
