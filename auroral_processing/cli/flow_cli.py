@@ -59,7 +59,8 @@ def add_parser(sub):
     s = flow_sub.add_parser("sweep", parents=[inputs, tvl1], help="run a grid of TV-L1 settings")
     s.add_argument("outdir", help="folder for the runs and summary.csv")
     s.add_argument("--grid", action="append", required=True, metavar="NAME=V1,V2,...",
-                   help="TV-L1 setting to sweep, e.g. --grid gamma=1,3 --grid lambda=0.05,0.15")
+                   help="setting to sweep, e.g. --grid gamma=1,3 --grid lambda=0.05,0.15; also gap=2,4,8 "
+                        "(then --stride defaults to the largest gap and --vmax is px/pair at --gap, scaled per gap)")
     s.add_argument("--video", nargs="*", choices=["quiver", "speed"], default=["quiver"],
                    help="videos to render per run (default quiver; give none to skip)")
     _add_video_options(s)
@@ -142,7 +143,7 @@ def run_video(args):
 
 def parse_grid(items):
     """["gamma=1,3", "lambda=0.05,0.15"] -> {"gamma": [1.0, 3.0], "lambda": [0.05, 0.15]}"""
-    types = {name.replace("-", "_"): _cast(f) for name, f in _tvl1_fields()}
+    types = {name.replace("-", "_"): _cast(f) for name, f in _tvl1_fields()} | {"gap": int}
     grid = {}
     for item in items:
         name, _, values = item.partition("=")

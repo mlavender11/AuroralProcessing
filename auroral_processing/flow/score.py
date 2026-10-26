@@ -13,6 +13,13 @@ dominated by featureless glow and noise:
                                (only for contiguous pairs: stride == gap)
     rough_diffuse              mean |flow gradient| in diffuse glow
     star_over_ring             median speed on stars / around them (<1: static stars pin the flow)
+    pair_dt, *_s               seconds per pair, and the speeds and roughness per second
+    lane_over_diffuse          speed_lane_p50 / speed_diffuse_p50: lane motion against the noise
+    warp_excess_lane           warp_lane - noise_floor: what the flow can't explain on the lanes
+                               (grows with gap as the lanes change shape)
+
+A sweep may vary the gap (``--grid gap=...``); runs are scored against their own frame pairs, and
+the plots switch to the per-second scores so gaps can be compared.
 
 Truth scores are added when the source is a benchmark (``flow.benchmark``), per pair against
 ``true_flow``:
@@ -49,6 +56,14 @@ REAL_PANELS = [
     ("rough_diffuse", "Flow roughness in diffuse glow", True),
     ("star_over_ring", "Speed on stars / around them", None),
 ]
+GAP_PANELS = [
+    ("warp_excess_lane", "Warp residual on structure above noise floor", True),
+    ("speed_diffuse_p50_s", "Median speed in diffuse glow, px/s", True),
+    ("lane_over_diffuse", "Speed on structure / in diffuse glow", False),
+    ("speed_lane_p50_s", "Median speed on structure, px/s", None),
+    ("speed_lane_p95_s", "p95 speed on structure, px/s", None),
+    ("rough_diffuse_s", "Flow roughness in diffuse glow, per s", True),
+]
 TRUTH_PANELS = [
     ("epe_lane", "Error on moving lanes, px", True),
     ("epe_lane_p95", "p95 error on moving lanes, px", True),
@@ -81,12 +96,13 @@ def _corr(a, b):
 
 
 class _Inputs:
-    """Frames, masks and truth shared by all runs of a sweep (they all use the same pairs)."""
+    """Frames, masks and truth shared by all runs of a sweep that use the same pairs."""
 
     def __init__(self, first_run, source=None):
         with open_flow(first_run) as f:
             cfg = read_config(f)
             self.i0, self.i1 = f["i0"][:], f["i1"][:]
+            self.dt = float(np.median(f["t1"][:] - f["t0"][:]))
             self.scaler = FrameScaler(float(f.attrs["lo"]), float(f.attrs["hi"]))
         self.contiguous = cfg["stride"] == cfg["gap"]
         self.source = Path(source or cfg["source"])
@@ -135,6 +151,7 @@ def _real_scores(F, I: _Inputs):
     rough = gx + gy
     row = dict(
         noise_floor=I.noise_floor,
+        pair_dt=I.dt,
         warp_lane=float(np.mean(warp_lane)),
         warp_diffuse=float(np.mean(warp_diffuse)),
         speed_lane_p50=float(np.median(s[L])),
@@ -144,6 +161,10 @@ def _real_scores(F, I: _Inputs):
         star_over_ring=float(np.median(s[:, I.stars & I.edge]) / np.median(s[:, I.ring & I.edge]))
         if (I.stars & I.edge).any() else np.nan,
     )
+    row["warp_excess_lane"] = row["warp_lane"] - I.noise_floor
+    row["lane_over_diffuse"] = row["speed_lane_p50"] / row["speed_diffuse_p50"]
+    for k in ("speed_lane_p50", "speed_lane_p95", "speed_diffuse_p50", "rough_diffuse"):
+        row[f"{k}_s"] = row[k] / I.dt
     if I.contiguous and len(F) > 1:
         both = L[1:] & L[:-1]
         dt = np.hypot(*(F[1:] - F[:-1]).transpose(3, 0, 1, 2))
@@ -193,7 +214,8 @@ def _runs(sweep_dir):
         if not path.exists():
             continue
         with open_flow(path) as f:
-            out.append((name, path, read_config(f)["tvl1"]))
+            cfg = read_config(f)
+            out.append((name, path, {"gap": cfg["gap"], **cfg["tvl1"]}))
     if not out:
         raise FileNotFoundError(f"no <run>/flow.h5 in {sweep_dir}")
     return out
@@ -219,22 +241,26 @@ def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
     """
     sweep_dir = Path(sweep_dir)
     runs = _runs(sweep_dir)
-    I = _Inputs(runs[0][1], source)
+    inputs = {}  # (i0, i1) -> _Inputs, so runs with the same pairs (e.g. the same gap) share them
     rows = []
-    for n, (name, path, tvl1) in enumerate(runs, 1):
+    for n, (name, path, settings) in enumerate(runs, 1):
         with open_flow(path) as f:
-            if not (np.array_equal(f["i0"][:], I.i0) and f.attrs["complete"]):
-                print(f"skipping {name}: incomplete or different pairs")
+            if not f.attrs["complete"]:
+                print(f"skipping {name}: incomplete")
                 continue
+            key = (f["i0"][:].tobytes(), f["i1"][:].tobytes())
             F = f["flow"][:]
-        row = {"run": name, **tvl1, **_real_scores(F, I)}
+        if key not in inputs:
+            inputs[key] = _Inputs(path, source)
+        I = inputs[key]
+        row = {"run": name, **settings, **_real_scores(F, I)}
         if I.truth:
             row.update(_truth_scores(F, I))
         rows.append(row)
         if progress:
             print(f"[{n}/{len(runs)}] {name}")
     df = pd.DataFrame(rows)
-    if I.truth:
+    if "epe_lane" in df:
         df["drift_rank"] = df["epe_lane"].rank()
         df["structure_rank"] = df["structure_corr"].rank(ascending=False)
         df["combined_rank"] = (df["drift_rank"] + df["structure_rank"]) / 2
@@ -246,7 +272,7 @@ def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
 
 
 def varied_settings(df) -> list[str]:
-    names = [external_name(n) for n in TVL1Params.__dataclass_fields__]
+    names = ["gap"] + [external_name(n) for n in TVL1Params.__dataclass_fields__]
     return [n for n in names if n in df and df[n].nunique() > 1]
 
 
@@ -261,8 +287,12 @@ def plot_scores(df, out, title=""):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
-    panels = [p for p in (TRUTH_PANELS if "epe_lane" in df else REAL_PANELS) if p[0] in df]
     varied = varied_settings(df)
+    if "epe_lane" in df:
+        panels = TRUTH_PANELS
+    else:
+        panels = GAP_PANELS if "gap" in varied else REAL_PANELS
+    panels = [p for p in panels if p[0] in df]
     cols = 3 if len(panels) > 4 else len(panels)
     rows = -(-len(panels) // cols)
     fig, axs = plt.subplots(rows, cols, figsize=(5 * cols, 4 * rows), layout="constrained", squeeze=False)
@@ -295,9 +325,9 @@ def plot_scores(df, out, title=""):
             ax.barh(d["run"], d[col], color="#4c78a8")
             ax.invert_yaxis()
             ax.tick_params(axis="y", labelsize=7)
-            if col == "warp_diffuse" and "noise_floor" in df:
+            if col == "warp_diffuse" and "noise_floor" in df and df["noise_floor"].nunique() == 1:
                 ax.axvline(df["noise_floor"].iloc[0], color="k", ls="--", lw=1)
-    if "warp_diffuse" in [p[0] for p in panels] and "noise_floor" in df:
+    if "warp_diffuse" in [p[0] for p in panels] and "noise_floor" in df and df["noise_floor"].nunique() == 1:
         title += f"   (noise floor for warp residual ≈ {df['noise_floor'].iloc[0]:.3f})"
     fig.suptitle(title)
     fig.savefig(out, dpi=90)
