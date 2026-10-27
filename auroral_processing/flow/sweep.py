@@ -40,7 +40,7 @@ def run_sweep(
     **compute_kw,
 ) -> Path:
     """
-    Run ``compute_flow`` for every combination of the TV-L1 settings in ``grid``.
+    Run ``compute_flow`` for every combination of the settings in ``grid``.
 
     Each run writes ``outdir/<run name>/flow.h5`` (and ``flow_<kind>.mp4`` for each of ``videos``).
     Runs that are already complete are skipped, and partial runs are resumed. Writes
@@ -51,7 +51,7 @@ def run_sweep(
     src : str or pathlib.Path
         Source HDF5 file.
     grid : dict[str, list]
-        TV-L1 setting name -> values to try, e.g. ``{"gamma": [1, 3], "lambda": [0.05, 0.15, 0.4]}``.
+        Setting name (of ``base_params``' method) -> values to try, e.g. ``{"gamma": [1, 3], "lambda": [0.05, 0.15, 0.4]}``.
         May also include ``"gap"`` and ``"stride"``. Swept gaps all use the same first frames:
         ``stride`` defaults to the largest gap and ``stop`` is shortened per gap, so runs with the
         same stride have the same pairs' i0. A
@@ -59,8 +59,8 @@ def run_sweep(
         with the gap (and ``arrow_scale`` inversely), so colours and arrows mean the same px/s.
     outdir : str or pathlib.Path
         Folder for the runs and the summary.
-    base_params : TVL1Params, optional
-        Settings not in ``grid``. OpenCV defaults if not given.
+    base_params : TVL1Params, PIVParams or FLCTParams, optional
+        The method, and its settings not in ``grid``. TV-L1 with OpenCV defaults if not given.
     videos : iterable of {"quiver", "speed"}
         Videos to render per run. Empty for none.
     video_kw : dict, optional
@@ -115,7 +115,7 @@ def run_sweep(
                 make_flow_video(flow_path, partial, kind=kind, progress=progress, **vkw)
                 partial.rename(video)
 
-        rows.append({"run": run_dir.name, "gap": kw.get("gap", 1), "stride": kw.get("stride") or kw.get("gap", 1), **params.to_dict(), **summarise(flow_path)})
+        rows.append({"run": run_dir.name, "method": params.METHOD, "gap": kw.get("gap", 1), "stride": kw.get("stride") or kw.get("gap", 1), **params.to_dict(), **summarise(flow_path)})
 
     summary = outdir / "summary.csv"
     pd.DataFrame(rows).to_csv(summary, index=False)

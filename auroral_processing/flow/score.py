@@ -41,8 +41,8 @@ import pandas as pd
 import cv2
 
 from auroral_processing.flow.compute_flow import FrameScaler
-from auroral_processing.flow.io import open_flow, read_config
-from auroral_processing.flow.params import TVL1Params, external_name
+from auroral_processing.flow.io import open_flow, read_config, read_method
+from auroral_processing.flow.params import METHODS, external_name
 from auroral_processing.flow.benchmark import find_stars, measure_noise
 
 BORDER = 16  # px ignored at the frame edge, where the flow is unreliable
@@ -215,7 +215,8 @@ def _runs(sweep_dir):
             continue
         with open_flow(path) as f:
             cfg = read_config(f)
-            out.append((name, path, {"gap": cfg["gap"], "stride": cfg["stride"], **cfg["tvl1"]}))
+            method, settings = read_method(cfg)
+            out.append((name, path, {"method": method, "gap": cfg["gap"], "stride": cfg["stride"], **settings}))
     if not out:
         raise FileNotFoundError(f"no <run>/flow.h5 in {sweep_dir}")
     return out
@@ -272,8 +273,14 @@ def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
 
 
 def varied_settings(df) -> list[str]:
-    names = ["gap", "stride"] + [external_name(n) for n in TVL1Params.__dataclass_fields__]
+    names = ["method", "gap", "stride"]
+    for cls in METHODS.values():
+        names += [n for n in map(external_name, cls.__dataclass_fields__) if n not in names]
     return [n for n in names if n in df and df[n].nunique() > 1]
+
+
+def _tick(v):
+    return f"{v:g}" if isinstance(v, (int, float, np.number)) else str(v)
 
 
 def plot_scores(df, out, title=""):
@@ -306,8 +313,8 @@ def plot_scores(df, out, title=""):
             t = df.pivot_table(index=varied[0], columns=varied[1], values=col)
             vals = t.values
             im = ax.imshow(vals, cmap="viridis" if lower is not True else "viridis_r", aspect="auto")
-            ax.set_xticks(range(t.shape[1]), [f"{v:g}" for v in t.columns])
-            ax.set_yticks(range(t.shape[0]), [f"{v:g}" for v in t.index])
+            ax.set_xticks(range(t.shape[1]), [_tick(v) for v in t.columns])
+            ax.set_yticks(range(t.shape[0]), [_tick(v) for v in t.index])
             ax.set_xlabel(varied[1])
             ax.set_ylabel(varied[0])
             span = np.nanmax(vals) - np.nanmin(vals) or 1

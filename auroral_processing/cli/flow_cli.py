@@ -2,10 +2,14 @@ import argparse
 from dataclasses import fields
 
 
-def _tvl1_fields():
-    from auroral_processing.flow.params import TVL1Params, external_name
+def _method_fields(method):
+    """(flag name, dataclass field) for each setting of a flow method, e.g. ("scale-step", ...)."""
+    from auroral_processing.flow.params import METHODS, external_name
 
-    return [(external_name(f.name).replace("_", "-"), f) for f in fields(TVL1Params)]
+    return [(external_name(f.name).replace("_", "-"), f) for f in fields(METHODS[method])]
+
+
+METHOD_NAMES = ("tvl1", "piv", "flct")
 
 
 def _cast(f):
@@ -32,14 +36,19 @@ def add_parser(sub):
     inputs.add_argument("--metrics", nargs="*", default=["warp_mae", "zero_mae"],
                         help="per-pair metrics: warp_mae zero_mae fb_error (fb_error doubles run time)")
     inputs.add_argument("--warm-start", action="store_true", help="start each pair from the previous pair's flow")
+    inputs.add_argument("--method", choices=METHOD_NAMES, default="tvl1",
+                        help="tvl1 (OpenCV TV-L1), piv (OpenPIV multi-pass), flct (Fourier local correlation tracking)")
     inputs.add_argument("-j", "--workers", type=int, default=1, help="parallel processes")
     inputs.add_argument("--overwrite", action="store_true", help="replace an existing output with different settings")
 
     tvl1 = argparse.ArgumentParser(add_help=False)
-    g = tvl1.add_argument_group("TV-L1 parameters (OpenCV defaults shown)")
-    for name, f in _tvl1_fields():
-        g.add_argument(f"--tvl1-{name}", dest=f.name, type=_cast(f), default=f.default, metavar=name.upper(),
-                       help=f"{f.metadata['help']} (default {f.default})")
+    titles = {"tvl1": "TV-L1 parameters (OpenCV defaults shown)", "piv": "PIV parameters (--method piv)",
+              "flct": "FLCT parameters (--method flct)"}
+    for method in METHOD_NAMES:
+        g = tvl1.add_argument_group(titles[method])
+        for name, f in _method_fields(method):
+            g.add_argument(f"--{method}-{name}", dest=f"{method}_{f.name}", type=_cast(f), default=f.default,
+                           metavar=name.upper(), help=f"{f.metadata['help']} (default {f.default})")
 
     # ---- aurora flow compute ----
     c = flow_sub.add_parser("compute", parents=[inputs, tvl1], help="compute flow into a flow .h5 file")
@@ -65,12 +74,19 @@ def add_parser(sub):
     s = flow_sub.add_parser("sweep", parents=[inputs, tvl1], help="run a grid of TV-L1 settings")
     s.add_argument("outdir", help="folder for the runs and summary.csv")
     s.add_argument("--grid", action="append", required=True, metavar="NAME=V1,V2,...",
-                   help="setting to sweep, e.g. --grid gamma=1,3 --grid lambda=0.05,0.15; also gap=2,4,8 and stride=4,8 "
+                   help="setting of --method to sweep, e.g. --grid gamma=1,3 --grid lambda=0.05,0.15, or for piv "
+                        "--grid window=8,16; also gap=2,4,8 and stride=4,8 "
                         "(then --stride defaults to the largest gap and --vmax is px/pair at --gap, scaled per gap)")
     s.add_argument("--video", nargs="*", choices=["quiver", "speed"], default=["quiver"],
                    help="videos to render per run (default quiver; give none to skip)")
     _add_video_options(s)
     s.set_defaults(func=run_sweep)
+
+    # ---- aurora flow compare ----
+    cmp = flow_sub.add_parser("compare", help="gather runs (e.g. the best of each method) into one folder to score together")
+    cmp.add_argument("outdir", help="folder to create; each run is linked in as <sweep>-<run>")
+    cmp.add_argument("run_dirs", nargs="+", help="run folders (each holding a flow.h5)")
+    cmp.set_defaults(func=run_compare)
 
     # ---- aurora flow score ----
     sc = flow_sub.add_parser("score", help="score the runs of a sweep (scores.csv + heatmaps)")
@@ -105,9 +121,9 @@ def _add_video_options(p):
 
 
 def _params(args):
-    from auroral_processing.flow.params import TVL1Params
+    from auroral_processing.flow.params import METHODS
 
-    return TVL1Params(**{f.name: getattr(args, f.name) for _, f in _tvl1_fields()})
+    return METHODS[args.method](**{f.name: getattr(args, f"{args.method}_{f.name}") for _, f in _method_fields(args.method)})
 
 
 def _compute_kw(args):
@@ -154,15 +170,15 @@ def run_repack(args):
         print(repack_flow(path))
 
 
-def parse_grid(items):
+def parse_grid(items, method="tvl1"):
     """["gamma=1,3", "lambda=0.05,0.15"] -> {"gamma": [1.0, 3.0], "lambda": [0.05, 0.15]}"""
-    types = {name.replace("-", "_"): _cast(f) for name, f in _tvl1_fields()} | {"gap": int, "stride": int}
+    types = {name.replace("-", "_"): _cast(f) for name, f in _method_fields(method)} | {"gap": int, "stride": int}
     grid = {}
     for item in items:
         name, _, values = item.partition("=")
         name = name.strip().replace("-", "_")
         if name not in types or not values:
-            raise SystemExit(f"bad --grid {item!r}; use NAME=V1,V2 with NAME one of {sorted(types)}")
+            raise SystemExit(f"bad --grid {item!r}; use NAME=V1,V2 with NAME one of {sorted(types)} (--method {method})")
         grid[name] = [types[name](v) for v in values.split(",")]
     return grid
 
@@ -172,7 +188,7 @@ def run_sweep(args):
 
     summary = sweep(
         args.filename,
-        parse_grid(args.grid),
+        parse_grid(args.grid, args.method),
         args.outdir,
         base_params=_params(args),
         videos=args.video,
@@ -180,6 +196,22 @@ def run_sweep(args):
         **_compute_kw(args),
     )
     print(summary)
+
+
+def run_compare(args):
+    from pathlib import Path
+
+    out = Path(args.outdir)
+    out.mkdir(parents=True, exist_ok=True)
+    for run in map(Path, args.run_dirs):
+        if not (run / "flow.h5").exists():
+            raise SystemExit(f"{run} has no flow.h5")
+        link = out / f"{run.resolve().parent.name}-{run.name}"
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        link.symlink_to(run.resolve(), target_is_directory=True)
+        print(link)
+    print(f"now: aurora flow score {out}")
 
 
 def run_score(args):

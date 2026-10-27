@@ -9,7 +9,8 @@ Flow output file layout (one file per run, separate from the source):
 
 ``flow`` is LZF-compressed (MATLAB needs the LZF filter plugin; ``repack_flow`` converts to gzip).
 
-attrs: ``config`` (JSON of everything that defines the run), each TV-L1 setting as ``tvl1_<name>``,
+attrs: ``config`` (JSON of everything that defines the run), each method setting as
+``<method>_<name>`` (e.g. ``tvl1_gamma``, ``piv_window``),
 ``lo``/``hi`` input scaling, ``cv2_version``, ``created``, ``complete``.
 """
 
@@ -53,8 +54,9 @@ class FlowWriter:
 
         a = self.f.attrs
         a["config"] = config_json
-        for k, v in config["tvl1"].items():
-            a[f"tvl1_{k}"] = v
+        method, settings = read_method(config)
+        for k, v in settings.items():
+            a[f"{method}_{k}"] = v
         for k, v in scaling.items():
             a[k] = v
         a["cv2_version"] = cv2.__version__
@@ -97,6 +99,12 @@ def open_flow(path) -> h5py.File:
 def read_config(f: h5py.File) -> dict:
     """The run configuration stored in a flow file (source, datasets, pairing, TV-L1 settings, ...)."""
     return json.loads(f.attrs["config"])
+
+
+def read_method(config: dict) -> tuple[str, dict]:
+    """(method, its settings) from a run config. Configs without a "method" key are TV-L1."""
+    method = config.get("method", "tvl1")
+    return method, config[method]
 
 
 def repack_flow(path, out=None) -> Path:

@@ -7,7 +7,8 @@ import numpy as np
 import h5py
 import cv2
 
-from auroral_processing.flow.params import TVL1Params, make_tvl1
+from auroral_processing.flow.params import TVL1Params
+from auroral_processing.flow.methods import ESTIMATORS, make_estimator
 from auroral_processing.flow.io import FlowWriter
 from auroral_processing.flow import metrics as M
 
@@ -67,12 +68,13 @@ def _to_unit(img):
 def iter_flow(src, frames, pairs, ks, params, scaler, metrics=M.DEFAULT_METRICS, warm_start=False):
     """
     Generator: compute the flow for pairs ``ks`` (indices into ``pairs``), yielding
-    ``(k, flow (H, W, 2) float32, {metric: value})``.
+    ``(k, flow (H, W, 2) float32, {metric: value})``. The metrics include the method's own
+    (e.g. PIV/FLCT ``invalid_frac``).
 
     With ``warm_start`` each pair starts from the previous pair's flow when they are consecutive.
     """
-    tvl1 = make_tvl1(params)
-    back = make_tvl1(params) if "fb_error" in metrics else None
+    est = make_estimator(params)
+    back = make_estimator(params) if "fb_error" in metrics else None
     cache = {}  # the last two scaled frames; with stride == gap each pair's i1 is the next pair's i0
     prev_k, prev_flow = None, None
 
@@ -90,10 +92,9 @@ def iter_flow(src, frames, pairs, ks, params, scaler, metrics=M.DEFAULT_METRICS,
             i0, i1 = (int(i) for i in pairs[k])
             a, b = load(i0), load(i1)
             init = prev_flow.copy() if warm_start and prev_k == k - 1 else None
-            tvl1.setUseInitialFlow(init is not None)
-            flow = tvl1.calc(a, b, init)
+            flow = est.calc(a, b, init)
 
-            m = {}
+            m = dict(est.last)
             if "warp_mae" in metrics:
                 m["warp_mae"] = M.warp_mae(_to_unit(a), _to_unit(b), flow)
             if "zero_mae" in metrics:
@@ -144,8 +145,8 @@ def compute_flow(
         Output flow file. Defaults to ``<src stem>_flow.h5`` next to the source.
     frames, times : str
         Frame dataset (N, H, W) and time dataset (N,) in ``src``.
-    params : TVL1Params, optional
-        TV-L1 settings; OpenCV defaults if not given.
+    params : TVL1Params, PIVParams or FLCTParams, optional
+        The method and its settings; TV-L1 with OpenCV defaults if not given.
     gap : int
         Frames between the two images of a pair (i1 = i0 + gap).
     stride : int, optional
@@ -156,10 +157,12 @@ def compute_flow(
         Percentiles of a frame sample used as the global ``lo``/``hi`` input scaling.
     input_dtype : {"float32", "uint8"}
         Image type given to TV-L1. "uint8" reproduces the old prototype's quantised input.
+        PIV and FLCT always get float 0-1.
     metrics : iterable of str
         Per-pair quality metrics to store, from ``metrics.METRICS``. "fb_error" doubles the run time.
     warm_start : bool
-        Start each pair from the previous pair's flow. Only applies within a chunk when ``workers > 1``.
+        Start each pair from the previous pair's flow (TV-L1 only). Only applies within a chunk when
+        ``workers > 1``.
     workers : int
         Processes to run in parallel. 1 runs in this process. Scripts using workers > 1 must call
         this under ``if __name__ == "__main__":`` (macOS starts workers by re-importing the script).
@@ -182,6 +185,10 @@ def compute_flow(
         raise ValueError(f"input_dtype must be one of {INPUT_DTYPES}, got {input_dtype!r}")
     if unknown := set(metrics) - set(M.METRICS):
         raise ValueError(f"unknown metrics {unknown}; allowed: {M.METRICS}")
+    est_cls = ESTIMATORS[params.METHOD]
+    if warm_start and not est_cls.supports_init:
+        raise ValueError(f"warm_start is only supported for TV-L1, not {params.LABEL}")
+    stored_metrics = metrics + tuple(m for m in est_cls.extra_metrics if m not in metrics)
 
     with h5py.File(src, "r") as f:
         ds, t = f[frames], f[times][:]
@@ -206,8 +213,10 @@ def compute_flow(
         input_dtype=input_dtype,
         metrics=list(metrics),
         warm_start=warm_start,
-        tvl1=params.to_dict(),
+        **{params.METHOD: params.to_dict()},
     )
+    if params.METHOD != "tvl1":  # TV-L1 configs stay exactly as before, so old runs still resume
+        config["method"] = params.METHOD
     writer = FlowWriter(
         out,
         config=config,
@@ -215,7 +224,7 @@ def compute_flow(
         t0=t[pairs[:, 0]],
         t1=t[pairs[:, 1]],
         shape=shape,
-        metrics=metrics,
+        metrics=stored_metrics,
         scaling=dict(lo=scaler.lo, hi=scaler.hi),
         overwrite=overwrite,
     )
