@@ -4,6 +4,10 @@ __pycache__
 consumers/__pycache__
 process_night.py
 optical_flow/papers/
+/optical_flow/data
+/optical_flow/sweep
+/optical_flow/tvl1
+/optical_flow/matlab_analysis
 *.log
 .vscode
 *.bak
