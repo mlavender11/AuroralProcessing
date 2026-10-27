@@ -120,6 +120,7 @@ def make_flow_video(
     dim=0.55,
     cmap="turbo",
     quality=6,
+    source=None,
     progress=True,
 ) -> Path:
     """
@@ -150,6 +151,8 @@ def make_flow_video(
         Matplotlib colormap name for speed.
     quality : int
         FFMPEG quality passed to imageio.
+    source : str or pathlib.Path, optional
+        Source file, if it has moved since the flow was computed (e.g. computed on another computer).
 
     Returns
     -------
@@ -179,7 +182,7 @@ def make_flow_video(
         scaler = FrameScaler(float(f.attrs["lo"]), float(f.attrs["hi"]), "uint8")
 
         with (
-            h5py.File(config["source"], "r") as src,
+            h5py.File(source or config["source"], "r") as src,
             imageio.get_writer(out, format="FFMPEG", fps=fps, codec="libx264", quality=quality) as writer,
         ):
             frames = src[config["frames"]]

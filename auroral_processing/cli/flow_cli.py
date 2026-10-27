@@ -52,8 +52,14 @@ def add_parser(sub):
     v.add_argument("flow_file", help="flow .h5 file from 'aurora flow compute'")
     v.add_argument("-o", "--out", default=None, help="output video (default <flow file>_<kind>.mp4)")
     v.add_argument("--kind", choices=["quiver", "speed"], default="quiver")
+    v.add_argument("--source", default=None, help="source file, if it has moved since the flow was computed")
     _add_video_options(v)
     v.set_defaults(func=run_video)
+
+    # ---- aurora flow repack ----
+    r = flow_sub.add_parser("repack", help="rewrite flow files with gzip so MATLAB can read and write them")
+    r.add_argument("flow_files", nargs="+", help="flow .h5 files (rewritten in place)")
+    r.set_defaults(func=run_repack)
 
     # ---- aurora flow sweep ----
     s = flow_sub.add_parser("sweep", parents=[inputs, tvl1], help="run a grid of TV-L1 settings")
@@ -138,7 +144,14 @@ def run_compute(args):
 def run_video(args):
     from auroral_processing.products.flow_video import make_flow_video
 
-    print(make_flow_video(args.flow_file, args.out, kind=args.kind, **_video_kw(args)))
+    print(make_flow_video(args.flow_file, args.out, kind=args.kind, source=args.source, **_video_kw(args)))
+
+
+def run_repack(args):
+    from auroral_processing.flow.io import repack_flow
+
+    for path in args.flow_files:
+        print(repack_flow(path))
 
 
 def parse_grid(items):
