@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
     chain = [
         {"stage": "normalize"},
-        {"stage": "binned_temporal_average", "bin_size": 10},
+        {"stage": "binned_temporal_average", "bin_size": 30},
         {"stage": "spatial_median", "k": 3},
         {"stage": "wiener"},
         {"stage": "to_uint16"},

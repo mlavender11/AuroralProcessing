@@ -33,7 +33,9 @@ def build_output_paths(hdf_path: Path, out_dir: Path, unix_time, i: int, *, came
     # fn = out_dir / f"DMC_{date_str}_{hour_str}"
     # fn = out_dir / f'{camera}-'
 
-    if camera == "HST":
+    if camera is None:
+        fn = out_dir / f"{hdf_path.stem}-{date_str}-{i}"
+    elif camera == "HST":
         fn = out_dir / f"{camera}-{serial}-{date_str}-{i}"
     else:
         fn = out_dir / f"{camera}-{date_str}-{i}"
