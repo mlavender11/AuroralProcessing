@@ -270,12 +270,14 @@ class Job:
                 raise ValueError(f"{what} {unused}: no chain has that stage (check the spelling)")
         out = []
         for spec in self.chains:
-            chain = apply_overrides(spec.stages, {k: v for k, v in self.sets.items() if matches(spec.stages, k)})
+            sets = {k: v for k, v in self.sets.items() if matches(spec.stages, k)}
+            chain = apply_overrides(spec.stages, sets)
             for c, overrides in expand_grid(chain, self.grid):
+                changed = {**sets, **overrides}
                 label = spec.label
-                if label and overrides:
-                    label = f"{label}_{override_tag(overrides)}"
-                out += [Task(src, c, label, overrides) for src in self.sources]
+                if label and changed:  # an explicit label names the chain as written; tag what was changed
+                    label = f"{label}_{override_tag(changed)}"
+                out += [Task(src, c, label, changed) for src in self.sources]
         return out
 
 

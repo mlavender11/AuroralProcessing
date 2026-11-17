@@ -234,6 +234,9 @@ def test_cli_run_and_list(src, tmp_path, capsys):
           "binned_temporal_average.bin_size=2,4", "-q"])
     folders = sorted(p.name for p in (out / src.stem).iterdir())
     assert len(folders) == 2 and all(f.startswith("c_bin_size") for f in folders)
+    main(["pipeline", "run", str(src), "--chain", str(chain), "--out", str(out), "--set",
+          "binned_temporal_average.bin_size=3", "-q"])
+    assert len(list((out / src.stem).glob("c_bin_size3-*"))) == 1
     main(["pipeline", "list", str(out)])
     assert "c_bin_size2" in capsys.readouterr().out
     with pytest.raises(SystemExit):
