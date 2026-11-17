@@ -1,0 +1,3 @@
+copied from lab mac
+initial sweep over scale steps
+deciding to go with scale step = 0.5 and warps = 5

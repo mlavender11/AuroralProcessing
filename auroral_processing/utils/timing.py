@@ -1,6 +1,5 @@
 import numpy as np
-from datetime import datetime, timezone
-import datetime
+from datetime import datetime, timezone, timedelta
 import h5py
 from pathlib import Path
 import re
@@ -87,7 +86,7 @@ def _assert_utc(dt: datetime) -> None:
     ValueError
         Raises if dt is not timezone-aware and in UTC.
     """
-    if dt.tzinfo is None or dt.utcoffset() != datetime.timedelta(0):
+    if dt.tzinfo is None or dt.utcoffset() != timedelta(0):
         raise ValueError(f"datetime must be timezone-aware and in UTC, got: {dt!r}")
 
 
@@ -108,7 +107,7 @@ def get_hourly_boundaries(start_time: datetime, end_time: datetime):
     """
 
     if start_time.minute > 0 or start_time.second > 0:
-        first_whole_hour = start_time.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
+        first_whole_hour = start_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         hours = [start_time]
     else:
         first_whole_hour = start_time
@@ -118,7 +117,7 @@ def get_hourly_boundaries(start_time: datetime, end_time: datetime):
 
     while current_hour < end_time:
         hours.append(current_hour)
-        current_hour += datetime.timedelta(hours=1)
+        current_hour += timedelta(hours=1)
 
     hours.append(end_time)
 

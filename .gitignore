@@ -19,5 +19,6 @@ optical_flow/papers/
 *.npz
 *.png
 *.tif
+*.bmp
 
 /optical_flow/processed
