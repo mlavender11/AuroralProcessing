@@ -10,6 +10,8 @@ dependencies = [
     "tqdm",
     "imageio[ffmpeg]",
     "pandas",
+    "pyyaml",
+    "scipy",
 ]
 authors = [
     { name = "Michael Lavender", email = "michaelzlavender@gmail.com" },

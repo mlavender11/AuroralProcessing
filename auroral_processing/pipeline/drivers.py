@@ -2,7 +2,6 @@ import numpy as np
 from tqdm.auto import tqdm
 
 
-# TODO write pipeline specs to imgs attrs
 # driver - used to pull from the end of a chain of generator stages
 def write_h5(
     src,
@@ -10,10 +9,12 @@ def write_h5(
     dataset_name,
     total_frames=None,
     time_name=None,
-    dtype=np.uint16,
+    dtype=None,
     compression="gzip",
     compression_opts=1,
     shuffle=True,
+    overwrite=False,
+    progress=True,
 ):
     """
     Drain a chain of (t, frame) stages into an image dataset plus a matching
@@ -32,8 +33,13 @@ def write_h5(
         and for the progress bar; the datasets grow or shrink to the real count.
     time_name : str, optional
         time dataset to write, by default f"{dataset_name}_ut1_unix"
-    time_attrs : dict, optional
-        attributes for the time dataset (e.g. copied from the source time dataset)
+    dtype : numpy dtype, optional
+        dtype of the image dataset. By default the dtype of the first frame, so a chain that
+        ends in float frames is stored as float (end the chain in to_uint16 for uint16).
+    overwrite : bool
+        replace existing datasets of the same names. Otherwise an existing dataset is an error.
+    progress : bool
+        show a progress bar
 
     Returns
     -------
@@ -48,12 +54,14 @@ def write_h5(
 
     for name in (dataset_name, time_name):
         if name in f:
-            del f[name]  # TODO implement protections
+            if not overwrite:
+                raise FileExistsError(f"dataset {name!r} already exists in {f.filename}; pass overwrite=True to replace it")
+            del f[name]
 
     imgs = times = None
     i = 0
 
-    for t, frame in tqdm(src, total=total_frames):
+    for t, frame in tqdm(src, total=total_frames, desc=dataset_name, unit="frame", disable=not progress):
         if imgs is None:
             frame_shape = frame.shape
             initial_len = total_frames or 1024
@@ -61,7 +69,7 @@ def write_h5(
                 dataset_name,
                 shape=(initial_len,) + frame_shape,
                 maxshape=(None,) + frame_shape,  # resizable
-                dtype=dtype,
+                dtype=frame.dtype if dtype is None else dtype,
                 chunks=(1,) + frame_shape,
                 compression=compression,
                 compression_opts=compression_opts,

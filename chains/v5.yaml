@@ -1,0 +1,9 @@
+# v5: bin first (5 frames), then median and Wiener. out_max: 255 reproduces the old 8-bit output.
+- stage: normalize
+- stage: binned_temporal_average
+  bin_size: 5
+- stage: spatial_median
+  k: 3
+- stage: wiener
+- stage: to_uint16
+  out_max: 255

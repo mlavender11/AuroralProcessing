@@ -1,0 +1,9 @@
+# v4: v2 with bin_size 30 (the base for the optical-flow sweeps). out_max: 255 reproduces the old 8-bit output.
+- stage: normalize
+- stage: spatial_median
+  k: 3
+- stage: binned_temporal_average
+  bin_size: 30
+- stage: wiener
+- stage: to_uint16
+  out_max: 255

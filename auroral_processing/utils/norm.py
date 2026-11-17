@@ -59,7 +59,7 @@ def compute_norm(
         end_idx = imgs.shape[0] - 1
 
     duration_seconds = ut_time[end_idx] - ut_time[start_idx]
-    n_samples = int(duration_seconds / sample_interval_seconds)
+    n_samples = max(1, int(duration_seconds / sample_interval_seconds))  # clips shorter than one interval: 1 frame
     sample_idx = np.linspace(start_idx, end_idx, n_samples, dtype=int)
 
     if imgs.dtype != np.uint16:

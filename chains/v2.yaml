@@ -1,0 +1,10 @@
+# v2: the original pipeline (v1 was this same chain without normalize; never saved, not migrated).
+# out_max: 255 reproduces the old 8-bit outputs exactly; drop it for full 16-bit range.
+- stage: normalize               # vmin/vmax fitted from the source (1st/99th percentile)
+- stage: spatial_median
+  k: 3
+- stage: binned_temporal_average
+  bin_size: 15
+- stage: wiener
+- stage: to_uint16
+  out_max: 255

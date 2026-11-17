@@ -1,0 +1,9 @@
+# Starting point for new outputs: v6's order with the full 16-bit range.
+# Sweep it with e.g. --grid binned_temporal_average.bin_size=5,10,30 --grid wiener=on,off
+- stage: normalize
+- stage: binned_temporal_average
+  bin_size: 10
+- stage: spatial_median
+  k: 3
+- stage: wiener
+- stage: to_uint16               # out_max defaults to 65535

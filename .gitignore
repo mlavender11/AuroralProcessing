@@ -19,3 +19,4 @@ optical_flow/papers/
 *.npz
 *.png
 
+/optical_flow/processed

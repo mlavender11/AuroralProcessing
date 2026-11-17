@@ -1,0 +1,13 @@
+# Example job: bin size x Wiener on/off on the 2-minute test clip, with previews.
+# Run:      aurora pipeline run jobs/example_bin_sweep.yaml
+# Preview:  aurora pipeline run jobs/example_bin_sweep.yaml --dry-run
+# Paths are relative to this file's folder.
+output: ../optical_flow/processed
+sources:
+  - ../optical_flow/data/2013-03-27-CamSer7196_015400-015600.h5
+chains:
+  - ../chains/bin_med_wiener.yaml
+grid:
+  binned_temporal_average.bin_size: [10, 30]
+  wiener: [on, off]
+preview: true
