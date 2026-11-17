@@ -216,10 +216,28 @@ def _runs(sweep_dir):
         with open_flow(path) as f:
             cfg = read_config(f)
             method, settings = read_method(cfg)
-            out.append((name, path, {"method": method, "gap": cfg["gap"], "stride": cfg["stride"], **settings}))
+            out.append((name, path, {"method": method, "gap": cfg["gap"], "stride": cfg["stride"], **settings,
+                                     **_preprocessing(cfg["source"])}))
     if not out:
         raise FileNotFoundError(f"no <run>/flow.h5 in {sweep_dir}")
     return out
+
+
+def _preprocessing(source) -> dict:
+    """
+    Pre-processing of a flow run's source, if it is a pipeline output (``run_chain``): the output
+    folder, the chain, and each stage setting as a ``<stage>.<setting>`` column. Empty otherwise.
+    """
+    from auroral_processing.pipeline.processing_chain import read_output_attrs
+    from auroral_processing.pipeline.jobs import chain_summary, stage_columns
+
+    try:
+        a = read_output_attrs(source)
+    except (OSError, ValueError):
+        return {}
+    if "chain" not in a:
+        return {}
+    return {"output": Path(source).parent.name, "chain": chain_summary(a["chain"]), **stage_columns(a["chain"])}
 
 
 def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
@@ -260,7 +278,9 @@ def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
         rows.append(row)
         if progress:
             print(f"[{n}/{len(runs)}] {name}")
-    df = pd.DataFrame(rows)
+    from auroral_processing.pipeline.jobs import fill_stage_columns
+
+    df = fill_stage_columns(pd.DataFrame(rows))
     if "epe_lane" in df:
         df["drift_rank"] = df["epe_lane"].rank()
         df["structure_rank"] = df["structure_corr"].rank(ascending=False)
@@ -276,7 +296,8 @@ def varied_settings(df) -> list[str]:
     names = ["method", "gap", "stride"]
     for cls in METHODS.values():
         names += [n for n in map(external_name, cls.__dataclass_fields__) if n not in names]
-    return [n for n in names if n in df and df[n].nunique() > 1]
+    names += [c for c in df.columns if "." in c]  # pre-processing settings, e.g. binned_temporal_average.bin_size
+    return [n for n in names if n in df and df[n].nunique(dropna=False) > 1]
 
 
 def _tick(v):
@@ -298,7 +319,9 @@ def plot_scores(df, out, title=""):
     if "epe_lane" in df:
         panels = TRUTH_PANELS
     else:
-        panels = GAP_PANELS if {"gap", "stride"} & set(varied) else REAL_PANELS
+        # per-second scores when the time per pair differs between runs (gap, stride or the bin size)
+        per_second = {"gap", "stride"} & set(varied) or ("pair_dt" in df and df["pair_dt"].round(6).nunique() > 1)
+        panels = GAP_PANELS if per_second else REAL_PANELS
     panels = [p for p in panels if p[0] in df]
     cols = 3 if len(panels) > 4 else len(panels)
     rows = -(-len(panels) // cols)

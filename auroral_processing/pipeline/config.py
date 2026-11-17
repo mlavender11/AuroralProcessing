@@ -297,7 +297,7 @@ def load_job(path) -> Job:
     return Job(
         sources=resolve_sources(data["sources"], base),
         chains=[load_chain(c, base) for c in _as_list(data["chains"])],
-        output=_resolve(data["output"], base) if data.get("output") else DEFAULT_OUTPUT,
+        output=_resolve(data["output"], base).resolve() if data.get("output") else DEFAULT_OUTPUT,
         frames=data.get("frames", "rawimg"),
         times=data.get("times", "ut1_unix"),
         grid={k: _as_list(v) for k, v in grid.items()},

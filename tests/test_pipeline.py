@@ -238,3 +238,31 @@ def test_cli_run_and_list(src, tmp_path, capsys):
     assert "c_bin_size2" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         main(["pipeline", "run", str(src), "--out", str(out)])  # no chain
+
+
+def test_flow_on_pipeline_outputs_compare_and_score(tmp_path):
+    """Flow sweeps inside two pipeline outputs, gathered with compare and scored with their pre-processing."""
+    import cv2
+    from auroral_processing.flow.score import varied_settings
+
+    rng = np.random.default_rng(3)
+    base = cv2.GaussianBlur(rng.random((96, 112)).astype(np.float32), (0, 0), 3)
+    frames = [np.roll(base, n, axis=1) * 3000 + 500 + rng.normal(0, 20, base.shape) for n in range(12)]
+    src = tmp_path / "moving.h5"
+    with h5py.File(src, "w") as f:
+        f["rawimg"] = np.clip(frames, 0, 65535).astype(np.uint16)
+        f["ut1_unix"] = 1.364e9 + np.arange(12) * 0.5
+
+    chain = [{"stage": "normalize"}, {"stage": "binned_temporal_average", "bin_size": 2}, {"stage": "wiener"},
+             {"stage": "to_uint16"}]
+    runs = []
+    for wiener in (True, False):
+        out = run_chain(src, apply_overrides(chain, {"wiener": wiener}), tmp_path / "processed", progress=False)
+        main(["flow", "sweep", str(out / "frames.h5"), str(out / "flow" / "s"), "--frames", "frames", "--times",
+              "frames_ut1_unix", "--tvl1-scales", "2", "--grid", "gamma=0", "--video"])
+        runs.append(str(out / "flow" / "s" / "gamma0"))
+    main(["flow", "compare", str(tmp_path / "cmp"), *runs])
+    assert len(list((tmp_path / "cmp").iterdir())) == 2  # same sweep/run names, distinct links
+    main(["flow", "score", str(tmp_path / "cmp"), "--no-plot"])
+    df = pd.read_csv(tmp_path / "cmp" / "scores.csv")
+    assert sorted(df["wiener.on"]) == [False, True] and "wiener.on" in varied_settings(df)

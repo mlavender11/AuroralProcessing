@@ -202,11 +202,20 @@ def run_compare(args):
     from pathlib import Path
 
     out = Path(args.outdir)
-    out.mkdir(parents=True, exist_ok=True)
+    names = {}
     for run in map(Path, args.run_dirs):
         if not (run / "flow.h5").exists():
             raise SystemExit(f"{run} has no flow.h5")
-        link = out / f"{run.resolve().parent.name}-{run.name}"
+        sweep = run.resolve().parent
+        name = f"{sweep.name}-{run.name}"
+        if sweep.parent.name == "flow" and (sweep.parent.parent / "frames.h5").exists():
+            name = f"{sweep.parent.parent.name}-{name}"  # pipeline output/flow/<sweep>/<run>: name the output too
+        if name in names:
+            raise SystemExit(f"{run} and {names[name]} would both be linked as {name}")
+        names[name] = run
+    out.mkdir(parents=True, exist_ok=True)
+    for name, run in names.items():
+        link = out / name
         if link.is_symlink() or link.exists():
             link.unlink()
         link.symlink_to(run.resolve(), target_is_directory=True)

@@ -51,17 +51,30 @@ def run_job(job: Job, *, dry_run=False, force=False, progress=True) -> pd.DataFr
     return pd.DataFrame(rows)
 
 
-def _stage_columns(chain) -> dict:
-    """{"binned_temporal_average.bin_size": 30, ...}; a stage that repeats gets "#2", "#3"."""
+def stage_columns(chain) -> dict:
+    """
+    {"wiener.on": True, "binned_temporal_average.bin_size": 30, ...}; a stage that repeats gets
+    "#2", "#3". ``<stage>.on`` marks the stages present, so a table can tell "wiener off" apart
+    (fill the missing ones with ``fill_stage_columns``).
+    """
     cols, seen = {}, {}
     for s in chain:
         name = s["stage"]
         seen[name] = seen.get(name, 0) + 1
         prefix = name if seen[name] == 1 else f"{name}#{seen[name]}"
+        cols[f"{prefix}.on"] = True
         for k, v in s.items():
             if k != "stage":
                 cols[f"{prefix}.{k}"] = v
     return cols
+
+
+def fill_stage_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """``<stage>.on`` is False where a row's chain doesn't have the stage."""
+    for c in df.columns:
+        if c.endswith(".on"):
+            df[c] = df[c].astype("boolean").fillna(False).astype(bool)
+    return df
 
 
 def chain_summary(chain) -> str:
@@ -98,9 +111,9 @@ def build_index(out_root) -> Path:
             "git_commit": a.get("git_commit", ""),
             "migrated_from": a.get("migrated_from", ""),
             "chain": chain_summary(a.get("chain", [])),
-            **_stage_columns(fitted),
+            **stage_columns(fitted),
         })
     index = out_root / INDEX_FILE
-    pd.DataFrame(rows).to_csv(index, index=False)
+    fill_stage_columns(pd.DataFrame(rows)).to_csv(index, index=False)
     return index
 
