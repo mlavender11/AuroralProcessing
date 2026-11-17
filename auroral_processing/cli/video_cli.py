@@ -1,10 +1,41 @@
+import argparse
+
+EPILOG = """\
+output (-o):
+  (none)              next to the input: clip.h5 -> clip.mp4
+  name.mp4            a bare name goes next to the input (so does ./name.mp4)
+  dir/name.mp4        relative to the current directory, not the input
+  /abs/dir/name.mp4   used as given
+  Missing folders are created. An existing video is overwritten without asking.
+  To write into the current directory, use -o "$PWD/name.mp4".
+
+The video is greyscale, every frame at the frame rate of --times, with the UTC
+time drawn on each frame.
+
+Pipeline outputs: `aurora pipeline run ... --preview` already writes a
+preview.mp4 into each output folder with the linear scale. Use this command for
+a video elsewhere, under another name, or of a file the pipeline didn't make.
+
+examples:
+  # raw file, default log scale; writes clip.mp4 next to clip.h5
+  aurora video data/clip.h5
+
+  # raw file into a videos folder (created if needed)
+  aurora video data/clip.h5 -o videos/clip_raw.mp4
+
+  # pipeline output, shown as stored
+  aurora video OUT/frames.h5 --frames frames --times frames_ut1_unix --scale linear -o videos/clip_norm.mp4
+"""
+
 
 def add_parser(sub):
     p = sub.add_parser(
         "video",
         help="Make mp4 video from HiST HDF5 file",
-        description="Make a video from a HiST HDF5 file at the source frame rate (no binning or averaging). "
+        description="Make a video from a HiST HDF5 file at the source frame rate (no binning or averaging).\n"
         "Used for looking at raw data and pre-processing outputs.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     p.add_argument("filename", help="input HDF5 file")
