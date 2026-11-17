@@ -278,6 +278,12 @@ def test_sweep_over_stride(src, tmp_path):
     assert len(scores) == 4 and scores["temporal_change_lane"].notna().sum() == 2  # only stride == gap
 
 
+def test_outputs_into_new_folders(src, tmp_path):
+    flow = compute_flow(src, tmp_path / "a" / "b" / "flow.h5", **KW)
+    assert flow.exists()
+    assert make_flow_video(flow, tmp_path / "c" / "v.mp4", grid=8, progress=False).exists()
+
+
 def test_video_with_moved_source(src, tmp_path):
     flow = compute_flow(src, tmp_path / "f.h5", **KW)
     moved = tmp_path / "moved.h5"

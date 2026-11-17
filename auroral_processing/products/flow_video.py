@@ -163,6 +163,7 @@ def make_flow_video(
         raise ValueError(f"kind must be one of {KINDS}, got {kind!r}")
     flow_path = Path(flow_path)
     out = Path(out) if out else flow_path.with_name(f"{flow_path.stem}_{kind}.mp4")
+    out.parent.mkdir(parents=True, exist_ok=True)
     lut = colour_lut(cmap)
 
     with open_flow(flow_path) as f:

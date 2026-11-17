@@ -41,6 +41,7 @@ class FlowWriter:
             return
 
         P, (H, W) = len(pairs), shape
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self.f = h5py.File(self.path, "w")
         self.f.create_dataset(
             "flow", (P, H, W, 2), dtype=np.float32, chunks=(1, H, W, 2), compression=compression, fillvalue=np.nan,
