@@ -220,8 +220,23 @@ def write_output(out_dir, stream, *, total_frames, chain, chain_fitted, source, 
     return final
 
 
+def preview_norm(out_dir):
+    """
+    Display scale for an output's preview: linear 0..out_max when the chain ends in ``to_uint16``,
+    so the video shows the frames as stored (the chain has already set the contrast). Otherwise
+    None, which leaves the video's default percentile log scale (right for raw-like counts).
+    """
+    from matplotlib.colors import Normalize
+
+    chain = read_output_attrs(out_dir).get("chain_fitted") or []
+    last = chain[-1] if chain else {}
+    if last.get("stage") == "to_uint16":
+        return Normalize(vmin=0, vmax=last["out_max"])
+    return None
+
+
 def render_preview(out_dir, force=False) -> Path | None:
-    """``preview.mp4`` of an output folder (uint16 outputs only, as the video's scaling needs them)."""
+    """``preview.mp4`` of an output folder (uint16 outputs only), scaled by ``preview_norm``."""
     from auroral_processing.products.video import make_video_from_source
 
     out_dir = Path(out_dir)
@@ -234,7 +249,8 @@ def render_preview(out_dir, force=False) -> Path | None:
         warnings.warn(f"no preview for {out_dir.name}: frames are {dtype}, previews need uint16 (end the chain in to_uint16)")
         return None
     partial = out_dir / "preview.partial.mp4"
-    make_video_from_source(out_dir / OUTPUT_FILE, out_fn=partial.name, img_dset=FRAMES, ut_dset=TIMES)
+    make_video_from_source(out_dir / OUTPUT_FILE, out_fn=partial.name, img_dset=FRAMES, ut_dset=TIMES,
+                           norm=preview_norm(out_dir))
     os.replace(partial, video)
     return video
 

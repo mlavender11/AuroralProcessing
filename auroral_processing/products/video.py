@@ -190,22 +190,26 @@ def make_video_from_times(
         return norm
 
 
-def make_video_from_source(src_fn, out_fn=None, img_dset="rawimg", ut_dset="ut1_unix"):
+def make_video_from_source(src_fn, out_fn=None, img_dset="rawimg", ut_dset="ut1_unix", norm=None):
     """
     Make a video from a HiST HDF File
     Output is at source frame-rate, no binning or averaging
     Used for testing flow preprocessing
 
+    out_fn: Output video. A bare file name goes next to the source; a path with a folder is used
+        as given. Defaults to the source with a .mp4 suffix.
     img_dset: Name of HDF dataset containing imgs
     ut_dset: Name of HDF dataset containing UT tim
+    norm: matplotlib Normalize mapping pixel values to brightness. Default: a log scale between the
+        1st and 99th percentiles of the data (right for raw counts). For frames a pipeline chain has
+        already scaled, pass a linear scale, e.g. Normalize(0, 65535).
+
+    Returns the path of the video.
     """
 
     hdf_path = Path(src_fn)
-
-    if not out_fn:
-        out_path = hdf_path.with_suffix(".mp4")
-    else:
-        out_path = hdf_path.with_name(out_fn)
+    out_path = _video_out_path(hdf_path, out_fn)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     cmap = plt.get_cmap("gray")
     font = get_font(size=16)
@@ -223,7 +227,8 @@ def make_video_from_source(src_fn, out_fn=None, img_dset="rawimg", ut_dset="ut1_
         cadence = np.median(np.diff(ut))
         fps = 1 / cadence
 
-        norm = compute_norm(imgs, ut, 1)
+        if norm is None:
+            norm = compute_norm(imgs, ut, 1)
         frame_to_rgb = get_frame_to_rgb(cmap, norm)
 
         # with imageio.get_writer(out_path, format="FFMPEG", fps=fps, codec="libx264", quality=6) as writer:
@@ -236,3 +241,13 @@ def make_video_from_source(src_fn, out_fn=None, img_dset="rawimg", ut_dset="ut1_
                 video.update(n, frame, frame_time)
 
             video.finalize()
+
+    return out_path
+
+
+def _video_out_path(hdf_path, out_fn):
+    """Where make_video_from_source writes: next to the source unless out_fn names a folder."""
+    if not out_fn:
+        return hdf_path.with_suffix(".mp4")
+    out_fn = Path(out_fn)
+    return hdf_path.with_name(out_fn.name) if out_fn.parent == Path(".") else out_fn

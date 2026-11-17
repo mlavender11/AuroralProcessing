@@ -272,3 +272,64 @@ def test_flow_on_pipeline_outputs_compare_and_score(tmp_path):
     df = pd.read_csv(tmp_path / "cmp" / "scores.csv")
     assert sorted(df["wiener.on"]) == [False, True] and "wiener.on" in varied_settings(df)
     assert df["noise_floor"].nunique() == 2  # each run scored against its own output's frames
+
+
+# ---------- previews and videos ----------
+def test_preview_norm_is_linear_to_out_max(src, tmp_path):
+    from matplotlib.colors import Normalize
+    from auroral_processing.pipeline.processing_chain import preview_norm
+
+    full = run_chain(src, [{"stage": "normalize"}, {"stage": "to_uint16"}], tmp_path, progress=False)
+    norm = preview_norm(full)
+    assert type(norm) is Normalize and (norm.vmin, norm.vmax) == (0, 65535)
+
+    eight_bit = run_chain(src, [{"stage": "normalize"}, {"stage": "to_uint16", "out_max": 255}], tmp_path, progress=False)
+    assert preview_norm(eight_bit).vmax == 255
+
+    no_to_uint16 = run_chain(src, [{"stage": "spatial_median"}], tmp_path, progress=False)  # chain not ending in to_uint16
+    assert preview_norm(no_to_uint16) is None
+
+
+def test_render_preview_uses_preview_norm(src, tmp_path, monkeypatch):
+    import auroral_processing.products.video as video
+    from auroral_processing.pipeline.processing_chain import render_preview
+
+    out = run_chain(src, [{"stage": "normalize"}, {"stage": "to_uint16"}], tmp_path, progress=False)
+    seen = {}
+    real = video.make_video_from_source
+
+    def spy(*args, **kw):
+        seen.update(kw)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(video, "make_video_from_source", spy)
+    assert render_preview(out) == out / "preview.mp4" and (out / "preview.mp4").exists()
+    assert seen["norm"].vmax == 65535 and not (out / "preview.partial.mp4").exists()
+
+
+def test_make_video_default_norm_and_out_paths(src, tmp_path, monkeypatch):
+    from matplotlib.colors import LogNorm
+    import auroral_processing.products.video as video
+
+    norms = []
+    real = video.get_frame_to_rgb
+    monkeypatch.setattr(video, "get_frame_to_rgb", lambda cmap, norm: norms.append(norm) or real(cmap, norm))
+
+    assert video.make_video_from_source(src) == src.with_suffix(".mp4")      # default: next to source
+    assert type(norms[-1]) is LogNorm                                         # default scale unchanged
+    assert video.make_video_from_source(src, "bare.mp4") == src.with_name("bare.mp4")
+    nested = tmp_path / "videos" / "sub" / "clip.mp4"
+    assert video.make_video_from_source(src, str(nested)) == nested and nested.exists()
+
+
+def test_cli_video_frames_times_scale(src, tmp_path, monkeypatch):
+    import auroral_processing.products.video as video
+
+    out = run_chain(src, [{"stage": "normalize"}, {"stage": "to_uint16"}], tmp_path / "p", progress=False)
+    norms = []
+    real = video.get_frame_to_rgb
+    monkeypatch.setattr(video, "get_frame_to_rgb", lambda cmap, norm: norms.append(norm) or real(cmap, norm))
+    dest = tmp_path / "v" / "out.mp4"
+    main(["video", str(out / OUTPUT_FILE), "--frames", "frames", "--times", "frames_ut1_unix",
+          "--scale", "linear", "-o", str(dest)])
+    assert dest.exists() and (norms[-1].vmin, norms[-1].vmax) == (0, 65535)
