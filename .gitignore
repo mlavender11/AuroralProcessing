@@ -18,5 +18,6 @@ optical_flow/papers/
 *.egg-info/
 *.npz
 *.png
+*.tif
 
 /optical_flow/processed
