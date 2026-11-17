@@ -202,17 +202,35 @@ def run_compare(args):
     from pathlib import Path
 
     out = Path(args.outdir)
-    names = {}
-    for run in map(Path, args.run_dirs):
+    runs = [Path(r) for r in args.run_dirs]
+    for run in runs:
         if not (run / "flow.h5").exists():
             raise SystemExit(f"{run} has no flow.h5")
+
+    def link_name(run, levels):
+        """<sweep>-<run>, prefixed by ``levels`` more parent folders (skipping a pipeline output's "flow")."""
+        parts = [p for p in run.resolve().parts[-(2 + levels) - 1 :] if p != "flow"]
+        return "-".join(parts[-(2 + levels) :])
+
+    def default_levels(run):
         sweep = run.resolve().parent
-        name = f"{sweep.name}-{run.name}"
-        if sweep.parent.name == "flow" and (sweep.parent.parent / "frames.h5").exists():
-            name = f"{sweep.parent.parent.name}-{name}"  # pipeline output/flow/<sweep>/<run>: name the output too
-        if name in names:
-            raise SystemExit(f"{run} and {names[name]} would both be linked as {name}")
-        names[name] = run
+        in_output = sweep.parent.name == "flow" and (sweep.parent.parent / "frames.h5").exists()
+        return 1 if in_output else 0  # pipeline output/flow/<sweep>/<run>: name the output too
+
+    levels = {run: default_levels(run) for run in runs}
+    for _ in range(4):  # add parent folders to names that collide, until they are unique
+        names = {}
+        for run in runs:
+            names.setdefault(link_name(run, levels[run]), []).append(run)
+        clashes = [rs for rs in names.values() if len(rs) > 1]
+        if not clashes:
+            break
+        for rs in clashes:
+            for run in rs:
+                levels[run] += 1
+    else:
+        raise SystemExit(f"can't give these runs distinct names: {[str(r) for rs in clashes for r in rs]}")
+    names = {name: rs[0] for name, rs in names.items()}
     out.mkdir(parents=True, exist_ok=True)
     for name, run in names.items():
         link = out / name

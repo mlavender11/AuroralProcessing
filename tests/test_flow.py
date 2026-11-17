@@ -278,6 +278,15 @@ def test_sweep_over_stride(src, tmp_path):
     assert len(scores) == 4 and scores["temporal_change_lane"].notna().sum() == 2  # only stride == gap
 
 
+def test_compare_names_runs_with_the_same_sweep_name(src, tmp_path):
+    for night in ("a", "b"):
+        main(["flow", "sweep", str(src), str(tmp_path / night / "best"), "--frames", "img", "--times", "t",
+              "--tvl1-scales", "3", "--grid", "gamma=1", "--video"])
+    main(["flow", "compare", str(tmp_path / "cmp"), str(tmp_path / "a" / "best" / "gamma1"),
+          str(tmp_path / "b" / "best" / "gamma1")])
+    assert sorted(p.name for p in (tmp_path / "cmp").iterdir()) == ["a-best-gamma1", "b-best-gamma1"]
+
+
 def test_outputs_into_new_folders(src, tmp_path):
     flow = compute_flow(src, tmp_path / "a" / "b" / "flow.h5", **KW)
     assert flow.exists()
