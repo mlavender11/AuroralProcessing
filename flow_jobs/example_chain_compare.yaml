@@ -1,0 +1,12 @@
+# Same TV-L1 flow on every pre-processing output of the 2-minute test clip, to compare the chains.
+#   aurora flow run flow_jobs/example_chain_compare.yaml -n     # list the runs first
+#   aurora flow run flow_jobs/example_chain_compare.yaml
+# Each run goes to <pipeline output>/flow/example_chain_compare/<run>/flow.h5;
+# optical_flow/flow/example_chain_compare/summary.csv compares them.
+inputs:
+  - ../optical_flow/processed/2013-03-27-CamSer7196_015400-015600/*/frames.h5
+flows:
+  - ../flows/tvl1_default.yaml
+stop: 101                                  # first 100 pairs; remove for the whole clip
+metrics: [warp_mae, zero_mae, fb_error]    # the default; fb_error doubles the run time
+workers: 4

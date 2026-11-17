@@ -76,32 +76,9 @@ def run_sweep(
     from auroral_processing.products.flow_video import make_flow_video
 
     outdir = Path(outdir)
-    base_params = base_params or TVL1Params()
-    names = list(grid)
     rows = []
-    gaps = [int(g) for g in grid.get("gap", [])]
-    if gaps:
-        ref_gap = compute_kw.pop("gap", 1) or 1
-        if compute_kw.get("stride") is None:
-            compute_kw["stride"] = max(gaps)
-        with h5py.File(src, "r") as f:
-            n_frames = f[compute_kw.get("frames", "rawimg")].shape[0]
-        stop = min(compute_kw.get("stop") or n_frames, n_frames)
-
-    combos = list(product(*grid.values()))
-    for n, values in enumerate(combos, 1):
-        settings = dict(zip(names, values))
-        params = base_params.replace(**{k: v for k, v in settings.items() if k not in PAIRING})
-        kw, vkw = dict(compute_kw), dict(video_kw or {})
-        if "stride" in settings:
-            kw["stride"] = int(settings["stride"])
-        if gaps:
-            gap = kw["gap"] = int(settings["gap"])
-            kw["stop"] = stop - max(gaps) + gap
-            if vkw.get("vmax"):
-                vkw["vmax"] *= gap / ref_gap
-            if vkw.get("arrow_scale"):
-                vkw["arrow_scale"] *= ref_gap / gap
+    combos = expand_flow_grid(src, grid, base_params or TVL1Params(), compute_kw, video_kw)
+    for n, (settings, params, kw, vkw) in enumerate(combos, 1):
         run_dir = outdir / run_name(settings)
         run_dir.mkdir(parents=True, exist_ok=True)
         if progress:
@@ -120,3 +97,41 @@ def run_sweep(
     summary = outdir / "summary.csv"
     pd.DataFrame(rows).to_csv(summary, index=False)
     return summary
+
+
+def expand_flow_grid(src, grid: dict[str, list], base_params, compute_kw: dict, video_kw: dict | None = None):
+    """
+    Every combination of ``grid`` as ``(settings, params, compute_kw, video_kw)`` for ``compute_flow``
+    and ``make_flow_video``.
+
+    ``grid`` keys are settings of ``base_params``' method, or "gap" / "stride". Swept gaps all use
+    the same first frames: ``stride`` defaults to the largest gap and ``stop`` is shortened per gap.
+    A ``video_kw`` ``vmax`` is for the ``gap`` in ``compute_kw`` (default 1) and is scaled with the
+    gap (``arrow_scale`` inversely), so colours and arrows mean the same px/s.
+    """
+    compute_kw = dict(compute_kw)
+    gaps = [int(g) for g in grid.get("gap", [])]
+    if gaps:
+        ref_gap = compute_kw.pop("gap", 1) or 1
+        if compute_kw.get("stride") is None:
+            compute_kw["stride"] = max(gaps)
+        with h5py.File(src, "r") as f:
+            n_frames = f[compute_kw.get("frames", "rawimg")].shape[0]
+        stop = min(compute_kw.get("stop") or n_frames, n_frames)
+
+    out = []
+    for values in product(*grid.values()):
+        settings = dict(zip(grid, values))
+        params = base_params.replace(**{k: v for k, v in settings.items() if k not in PAIRING})
+        kw, vkw = dict(compute_kw), dict(video_kw or {})
+        if "stride" in settings:
+            kw["stride"] = int(settings["stride"])
+        if gaps:
+            gap = kw["gap"] = int(settings["gap"])
+            kw["stop"] = stop - max(gaps) + gap
+            if vkw.get("vmax"):
+                vkw["vmax"] *= gap / ref_gap
+            if vkw.get("arrow_scale"):
+                vkw["arrow_scale"] *= ref_gap / gap
+        out.append((settings, params, kw, vkw))
+    return out

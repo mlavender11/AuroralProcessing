@@ -382,6 +382,8 @@ Keeping flow sweeps inside the output folder (`$OUT/flow/<sweep name>`) means:
 
 The companion document *Changes and Flow Next Steps* has the full flow workflow.
 
+To run the same flow on many outputs from YAML, and get one `summary.csv` comparing them, use a flow job file and `aurora flow run`. See `docs/flow_jobs.md`.
+
 ---
 
 ## 14. YAML gotchas

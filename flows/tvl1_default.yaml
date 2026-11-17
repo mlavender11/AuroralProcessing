@@ -1,0 +1,7 @@
+# TV-L1 with OpenCV's default settings, consecutive frames.
+# Any setting from `aurora flow compute -h` (TV-L1 parameters) can go under params.
+method: tvl1
+params:
+  lambda: 0.15        # data weight: higher = follow the images more, smooth less
+  gamma: 0            # brightness-change weight (>0 tolerates illumination change)
+gap: 1                # frames between the two images of a pair

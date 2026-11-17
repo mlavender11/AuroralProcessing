@@ -1,5 +1,6 @@
 import argparse
 from dataclasses import fields
+from pathlib import Path
 
 
 def _method_fields(method):
@@ -109,6 +110,111 @@ def add_parser(sub):
     b.add_argument("--seed", type=int, default=0)
     b.add_argument("--overwrite", action="store_true", help="replace an existing benchmark")
     b.set_defaults(func=run_benchmark)
+
+    # ---- aurora flow run ----
+    j = flow_sub.add_parser(
+        "run",
+        help="run a flow job file (inputs x flows x grid) and summarise the metrics",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Run a flow job file, or flow settings files on inputs. Each run goes to\n"
+        "<pipeline output>/flow/<job>/<run>/flow.h5 (other inputs: <job folder>/sources/<name>/<run>/);\n"
+        "the job folder <output>/<job>/ gets runs/ links, runs.csv and summary.csv.",
+        epilog=RUN_EPILOG,
+    )
+    j.add_argument("target", nargs="+", help="flow job file (.yaml), or inputs: .h5 files, folders or globs")
+    j.add_argument("-f", "--flow", action="append", default=[], metavar="FLOW.yaml",
+                   help="flow settings file (repeatable). Required with inputs; replaces a job file's flows")
+    j.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                   help="set a flow setting in every flow that has it, e.g. lambda=0.1 or gap=2")
+    j.add_argument("--grid", action="append", default=[], metavar="NAME=V1,V2",
+                   help="sweep a setting, e.g. lambda=0.05,0.15 (repeatable; adds to a job file's grid)")
+    j.add_argument("--job-name", default=None, help="job name with inputs (default: the first flow's label)")
+    j.add_argument("-o", "--out", default=None, help="parent folder of the job folder (default: job file's output, "
+                                                     "else optical_flow/flow)")
+    j.add_argument("-j", "--workers", type=int, default=None, help="parallel processes per run")
+    j.add_argument("--score", action="store_true", default=None, help="also run 'aurora flow score' on the runs")
+    j.add_argument("--force", action="store_true", help="recompute runs that already exist")
+    j.add_argument("-n", "--dry-run", action="store_true", help="list the runs and their folders without computing")
+    j.add_argument("-q", "--quiet", action="store_true", help="no progress output")
+    j.set_defaults(func=run_job)
+
+
+RUN_EPILOG = """\
+examples:
+  aurora flow run flow_jobs/chain_compare.yaml
+  aurora flow run flow_jobs/chain_compare.yaml -n                       # what would run, where
+  aurora flow run flow_jobs/chain_compare.yaml --grid lambda=0.05,0.15  # add a sweep
+  aurora flow run filtered/clip/*/frames.h5 -f flows/tvl1_default.yaml --set gap=2
+
+flow settings file (flows/tvl1_default.yaml):
+  method: tvl1                  # tvl1 | piv | flct
+  params: {lambda: 0.15}        # names as in the --tvl1-* / --piv-* / --flct-* flags
+  gap: 1                        # optional; also stride, warm_start, clip, input_dtype
+
+flow job file (its file name is the job name):
+  output: ../flow
+  inputs: [../filtered/clip/*/frames.h5]
+  flows: [../flows/tvl1_default.yaml]
+  grid: {lambda: [0.05, 0.15]}
+  metrics: [warp_mae, zero_mae, fb_error]   # the default; fb_error doubles run time
+  workers: 4
+  video: [quiver]
+  score: false
+
+Rerunning skips finished runs and resumes partial ones. A run whose folder holds a
+flow file made with other settings fails with "different settings"; use --force.
+"""
+
+
+def build_flow_job(args):
+    """A FlowJob from a job file or inputs, with the command-line options applied on top."""
+    from auroral_processing.flow.jobs import FlowJob, load_flow_job, load_flow
+    from auroral_processing.pipeline.config import resolve_sources, parse_assignments, parse_grid
+
+    first = Path(args.target[0])
+    if len(args.target) == 1 and first.suffix.lower() in (".yaml", ".yml"):
+        job = load_flow_job(first)
+        if args.flow:
+            job.flows = [load_flow(f) for f in args.flow]
+        if args.job_name:
+            job.name = args.job_name
+    else:
+        if not args.flow:
+            raise SystemExit("give at least one --flow FLOW.yaml with inputs (or pass a flow job file)")
+        flows = [load_flow(f) for f in args.flow]
+        job = FlowJob(name=args.job_name or flows[0].label, inputs=resolve_sources(args.target), flows=flows)
+    job.sets.update(parse_assignments(args.set))
+    job.grid.update(parse_grid(args.grid))
+    if args.out:
+        job.output = Path(args.out).resolve()
+    if args.workers:
+        job.workers = args.workers
+    if args.score:
+        job.score = True
+    extra = [f"--set {s}" for s in args.set] + [f"--grid {g}" for g in args.grid] + [f"--flow {f}" for f in args.flow]
+    job.note = ("command-line: " + " ".join(extra)) if extra else ""
+    return job
+
+
+def run_job(args):
+    import pandas as pd
+    from auroral_processing.flow.jobs import run_flow_job
+
+    try:
+        job = build_flow_job(args)
+        table = run_flow_job(job, dry_run=args.dry_run, force=args.force, progress=not args.quiet)
+    except (ValueError, FileNotFoundError) as e:
+        raise SystemExit(f"error: {e}")
+
+    with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 200,
+                           "display.max_colwidth", 70):
+        print(f"\njob folder: {job.folder}")
+        print(table.drop(columns="folder").to_string(index=False))
+    if not args.dry_run and (job.folder / "summary.csv").exists():
+        print(f"summary: {job.folder / 'summary.csv'}")
+    failed = table["status"].str.startswith("failed").sum()
+    if failed:
+        raise SystemExit(f"{failed} of {len(table)} failed")
 
 
 def _add_video_options(p):

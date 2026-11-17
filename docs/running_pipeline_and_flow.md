@@ -418,6 +418,22 @@ aurora flow compare optical_flow/compare/methods $O/flow/bench_gl/gamma3_lambda0
 aurora flow score optical_flow/compare/methods
 ```
 
+### B14b. Flow job files (`aurora flow run`)
+
+Instead of repeating `aurora flow sweep` for each output, describe the experiment once in YAML:
+
+```bash
+aurora flow run flow_jobs/example_chain_compare.yaml -n    # list runs and folders
+aurora flow run flow_jobs/example_chain_compare.yaml
+```
+
+| | Path |
+|---|---|
+| **IN** | every `frames.h5` matched by the job's `inputs:` |
+| **OUT** | `<output>/flow/<job>/<run>/flow.h5` for each run; `optical_flow/flow/<job>/summary.csv` comparing them (warp_mae, zero_mae, fb_error, chain settings) |
+
+`frames`/`times` are detected automatically. Full guide: `docs/flow_jobs.md`.
+
 ### B15. MATLAB
 
 ```bash

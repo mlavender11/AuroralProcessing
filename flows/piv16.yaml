@@ -1,0 +1,5 @@
+# Multi-pass PIV: 64 -> 32 -> 16 px windows.
+method: piv
+params:
+  window: 16
+  first_window: 64
