@@ -188,7 +188,7 @@ class ToUint16(Stage):
     name = "to_uint16"
     low: float = 0.0
     high: float = 1.0
-    out_max: int = 2**16  # uint16 max
+    out_max: int = 2**16 - 1  # uint16 max (65535); 2**16 would wrap to 0
 
     def __post_init__(self):
         if self.high <= self.low:
