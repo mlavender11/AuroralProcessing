@@ -13,7 +13,7 @@ import pandas as pd
 
 from auroral_processing.pipeline.config import Job
 from auroral_processing.pipeline.processing_chain import (
-    OUTPUT_FILE, PREVIEW_FILE, is_complete, output_dir, read_output_attrs, run_chain,
+    OUTPUT_FILE, PREVIEW_FILE, find_output, is_complete, read_output_attrs, run_chain,
 )
 
 INDEX_FILE = "index.csv"
@@ -29,7 +29,7 @@ def run_job(job: Job, *, dry_run=False, force=False, progress=True) -> pd.DataFr
     tasks = job.tasks()
     rows = []
     for n, task in enumerate(tasks, 1):
-        out = output_dir(task.source, task.chain, job.output, label=task.label, frames=job.frames, times=job.times)
+        out = find_output(task.source, task.chain, job.output, label=task.label, frames=job.frames, times=job.times)
         exists = is_complete(out, task.chain)
         row = {"source": task.source.name, "folder": str(out.relative_to(job.output)), **task.overrides}
         if dry_run:

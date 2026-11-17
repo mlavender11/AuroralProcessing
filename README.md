@@ -43,6 +43,20 @@ optical_flow/           Optical-flow experiments: OpenCV (Farneback, TV-L1),
                         OpenPIV, FLCT, MATLAB (Black & Anandan / Horn-Schunck)
 ```
 
+## Pre-processing (YAML chains)
+
+Pre-processing chains are YAML files in `chains/`; batches are job files in `jobs/`. Each result
+goes to its own folder (`optical_flow/processed/<source>/<label>-<hash>/frames.h5`) and is skipped
+if it already exists:
+
+```bash
+aurora pipeline run path/to/file.h5 --chain chains/v4.yaml
+aurora pipeline run jobs/example_bin_sweep.yaml --dry-run
+aurora pipeline list
+```
+
+See [docs/pipeline_tutorial.md](docs/pipeline_tutorial.md).
+
 ## Data format
 
 HDF5 files are expected to contain image frames in `rawimg` and per-frame UT

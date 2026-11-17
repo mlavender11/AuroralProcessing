@@ -137,6 +137,8 @@ def test_run_chain_writes_skips_and_forces(src, tmp_path):
     other = run_chain(src, apply_overrides(CHAIN, {"binned_temporal_average.bin_size": 2}), out_root, progress=False)
     assert other != out and read_output_attrs(other)["n_frames"] == N // 2
 
+    assert run_chain(src, CHAIN, out_root, label="renamed", progress=False) == out  # same chain, other label
+
     elsewhere = run_chain(src, CHAIN, tmp_path / "elsewhere", label="mine", progress=False)
     assert elsewhere.name.split("-")[-1] == out.name.split("-")[-1] and elsewhere.name.startswith("mine-")
 

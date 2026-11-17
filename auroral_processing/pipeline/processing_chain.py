@@ -89,6 +89,20 @@ def output_dir(src, chain, out_root, *, label=None, frames="rawimg", times="ut1_
     return Path(out_root) / src.stem / name
 
 
+def find_output(src, chain, out_root, *, label=None, frames="rawimg", times="ut1_unix") -> Path:
+    """
+    The folder for this source and chain: an existing complete output with the same hash, under any
+    label (the same chain run under another name is the same output), else ``output_dir``.
+    """
+    target = output_dir(src, chain, out_root, label=label, frames=frames, times=times)
+    if not is_complete(target, chain):
+        h = target.name.rsplit("-", 1)[-1]
+        for other in sorted(target.parent.glob(f"*-{h}")):
+            if other != target and is_complete(other, chain):
+                return other
+    return target
+
+
 def connect_stages(stages, src):
     """Needs a driver at the end - e.g. write_h5"""
     for stage in stages:
@@ -250,6 +264,7 @@ def run_chain(
         Output folder; the result goes to ``<out_root>/<source stem>/<label>-<hash8>/``.
     label : str, optional
         Readable start of the folder name. Defaults to one built from the stages, e.g. "norm_bin30_med3".
+        If this chain already has an output under another label, that folder is used.
     frames, times : str
         Frame and time datasets in ``src``.
     preview : bool
@@ -265,7 +280,7 @@ def run_chain(
     src = Path(src)
     canonical = canonical_chain(chain)
     label = _safe(label or auto_label(chain))
-    out_dir = output_dir(src, chain, out_root, label=label, frames=frames, times=times)
+    out_dir = find_output(src, chain, out_root, label=label, frames=frames, times=times)
 
     if is_complete(out_dir, chain) and not force:
         if progress:
