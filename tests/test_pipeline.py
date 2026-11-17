@@ -271,3 +271,4 @@ def test_flow_on_pipeline_outputs_compare_and_score(tmp_path):
     main(["flow", "score", str(tmp_path / "cmp"), "--no-plot"])
     df = pd.read_csv(tmp_path / "cmp" / "scores.csv")
     assert sorted(df["wiener.on"]) == [False, True] and "wiener.on" in varied_settings(df)
+    assert df["noise_floor"].nunique() == 2  # each run scored against its own output's frames

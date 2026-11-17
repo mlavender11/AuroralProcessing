@@ -260,14 +260,15 @@ def score_sweep(sweep_dir, *, source=None, plot=True, progress=True) -> Path:
     """
     sweep_dir = Path(sweep_dir)
     runs = _runs(sweep_dir)
-    inputs = {}  # (i0, i1) -> _Inputs, so runs with the same pairs (e.g. the same gap) share them
+    inputs = {}  # (source, frames, i0, i1) -> _Inputs, so runs of one source with the same pairs share them
     rows = []
     for n, (name, path, settings) in enumerate(runs, 1):
         with open_flow(path) as f:
             if not f.attrs["complete"]:
                 print(f"skipping {name}: incomplete")
                 continue
-            key = (f["i0"][:].tobytes(), f["i1"][:].tobytes())
+            cfg = read_config(f)
+            key = (str(source or cfg["source"]), cfg["frames"], f["i0"][:].tobytes(), f["i1"][:].tobytes())
             F = f["flow"][:]
         if key not in inputs:
             inputs[key] = _Inputs(path, source)
