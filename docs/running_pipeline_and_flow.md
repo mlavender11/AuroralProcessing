@@ -430,7 +430,7 @@ aurora flow run flow_jobs/example_chain_compare.yaml
 | | Path |
 |---|---|
 | **IN** | every `frames.h5` matched by the job's `inputs:` |
-| **OUT** | `<output>/flow/<job>/<run>/flow.h5` for each run; `optical_flow/flow/<job>/summary.csv` comparing them (warp_mae, zero_mae, fb_error, chain settings) |
+| **OUT** | `optical_flow/flow/<job>/`: each run in `<source>/<output>/<run>/flow.h5`, and `summary.csv` comparing them (warp_mae, zero_mae, fb_error, chain settings) |
 
 `frames`/`times` are detected automatically. Full guide: `docs/flow_jobs.md`.
 

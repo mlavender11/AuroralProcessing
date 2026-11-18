@@ -24,8 +24,8 @@ The example runs TV-L1 with default settings on every pipeline output of the 2-m
 | | Path |
 |---|---|
 | **IN** | `optical_flow/processed/2013-03-27-CamSer7196_015400-015600/*/frames.h5` |
-| **OUT** (each run) | `<that output>/flow/example_chain_compare/tvl1_default/flow.h5` |
 | **OUT** (job folder) | `optical_flow/flow/example_chain_compare/`: `summary.csv`, `runs.csv`, `runs/`, `job.yaml` |
+| **OUT** (each run) | `optical_flow/flow/example_chain_compare/2013-03-27-CamSer7196_015400-015600/<output>/tvl1_default/flow.h5` |
 
 ---
 
@@ -96,28 +96,28 @@ Relative paths are relative to the job file's folder.
 
 ## 4. Where results go
 
+Everything goes in the job folder, `<output>/<job>/`. Nothing is written next to your inputs.
+
 ```
-filtered/2013-04-14-CamSer1387_extract/
-  norm_only-4427dcf1/
-    frames.h5
-    flow/chain_compare/                         <- one folder per flow job
+flow/chain_compare/                              <- the job folder
+  job.yaml       copy of the job file (plus any command-line --set/--grid)
+  runs.csv       status of each run from the last `aurora flow run`
+  summary.csv    one row per run (below)
+  runs/          a link to every run: <output>-<run>
+  2013-04-14-CamSer1387_extract/                 <- the source
+    norm_only-4427dcf1/                          <- the pipeline output
       tvl1_default_lambda0.05/flow.h5
       tvl1_default_lambda0.15/flow.h5
       piv16/flow.h5
-  full_stage_bin_size10-0bc12f19/
-    frames.h5
-    flow/chain_compare/...
-flow/chain_compare/                              <- the job folder
-  job.yaml       copy of the job file (plus any command-line --set/--grid)
-  runs/          a link to every run: <output>-<run>
-  runs.csv       status of each run from the last `aurora flow run`
-  summary.csv    one row per run (below)
+    full_stage_bin_size10-0bc12f19/
+      ...
 ```
 
-- **Pipeline outputs:** runs go next to the frames, in `<output>/flow/<job>/<run>/`.
-- **Raw sources** (not pipeline outputs) go in the job folder, at `<job folder>/sources/<file name>/<run>/`, so nothing is written into your data folders.
+- **Pipeline outputs:** `<job folder>/<source>/<output>/<run>/flow.h5`.
+- **Other inputs** (not pipeline outputs): `<job folder>/<file name>/raw/<run>/flow.h5`.
 - **Run name:** the flow's label plus each grid value, e.g. `tvl1_default_lambda0.05`.
-- **Deleting a pipeline output deletes its flow too.** The job's link then dangles, and `summary.csv` lists that run as `missing`.
+- **To delete a job, delete its folder.** Your pipeline outputs aren't affected. Deleting a pipeline output doesn't delete its flow, but its chain columns in `summary.csv` will be empty, because the chain is read from the output.
+- **Two inputs with the same source and output names** (for example, copies in two folders) would share run folders. That's an error, so put them in separate jobs.
 
 ---
 
@@ -156,6 +156,7 @@ aurora flow run filtered/clip/*/frames.h5 -f flows/tvl1_default.yaml -o flow --j
 
 | Situation | What happens |
 |---|---|
+| Stop a job | Press Ctrl+C once, even with several workers. Saved pairs are kept and the file is closed properly. Pairs that workers were still computing are lost. Don't `kill` the process, because that can leave `flow.h5` unreadable. |
 | Rerun the same job | Finished runs say `exists` and are skipped; interrupted runs resume where they stopped |
 | You edited the job so a run folder would get different settings | That run fails with `exists with different settings`, and the old result is kept. `-n` shows `exists, different settings`. |
 | You want the new settings in the same folders | `--force` recomputes those runs |

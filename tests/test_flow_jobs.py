@@ -105,11 +105,12 @@ def test_run_layout_summary_rerun_and_force(outputs, job_file, tmp_path):
     table = run_flow_job(job, progress=False)
     assert set(table["status"]) == {"done"}
 
-    # runs inside each pipeline output, links + summary in the job folder
-    for out in outputs:
-        for lam in ("0.1", "0.3"):
-            assert (out.parent / "flow" / "compare" / f"tvl1_fast_lambda{lam}" / "flow.h5").exists()
+    # everything in the job folder: <job>/<source>/<output>/<run>, nothing next to the inputs
     folder = tmp_path / "flow" / "compare"
+    for out in outputs:
+        assert not (out.parent / "flow").exists()
+        for lam in ("0.1", "0.3"):
+            assert (folder / out.parent.parent.name / out.parent.name / f"tvl1_fast_lambda{lam}" / "flow.h5").exists()
     assert (folder / "job.yaml").read_text() == job_file.read_text()
     links = sorted(p.name for p in (folder / "runs").iterdir())
     assert links == sorted(f"{o.parent.name}-tvl1_fast_lambda{lam}" for o in outputs for lam in ("0.1", "0.3"))
@@ -140,7 +141,7 @@ def test_raw_source_goes_to_job_folder_and_score(raw, tmp_path):
     flow = load_flow({"label": "tv", "params": FAST})
     job = FlowJob("rawjob", [raw], [flow], output=tmp_path / "flow", metrics=("warp_mae", "zero_mae"), score=True)
     assert set(run_flow_job(job, progress=False)["status"]) == {"done"}
-    run = tmp_path / "flow" / "rawjob" / "sources" / raw.stem / "tv" / "flow.h5"
+    run = tmp_path / "flow" / "rawjob" / raw.stem / "raw" / "tv" / "flow.h5"
     assert run.exists() and not (raw.parent / "flow").exists()  # nothing written next to the data
     folder = tmp_path / "flow" / "rawjob"
     assert (folder / "runs" / f"{raw.stem}-tv").is_symlink()
@@ -153,9 +154,21 @@ def test_summary_reports_deleted_runs(outputs, job_file, tmp_path):
     import shutil
 
     run_flow_job(load_flow_job(job_file), progress=False)
-    shutil.rmtree(outputs[0].parent)  # delete a pipeline output, and its flow with it
-    s = pd.read_csv(build_summary(tmp_path / "flow" / "compare"))
-    assert (s["status"] == "missing").sum() == 2 and (s["status"] == "complete").sum() == 2
+    folder = tmp_path / "flow" / "compare"
+    shutil.rmtree(folder / outputs[0].parent.parent.name / outputs[0].parent.name)  # delete one output's runs
+    (folder / "runs" / "._metadata").write_bytes(b"")  # what macOS leaves beside links on exFAT drives
+    s = pd.read_csv(build_summary(folder))
+    assert (s["status"] == "missing").sum() == 2 and (s["status"] == "complete").sum() == 2 and len(s) == 4
+
+
+def test_inputs_that_would_share_a_run_folder_are_an_error(outputs, tmp_path):
+    import shutil
+
+    twin = tmp_path / "other" / outputs[0].parent.parent.name / outputs[0].parent.name
+    shutil.copytree(outputs[0].parent, twin)  # same source and output names, different place
+    job = FlowJob("j", [outputs[0], twin / "frames.h5"], [load_flow({"label": "tv", "params": FAST})])
+    with pytest.raises(ValueError, match="would share the run folder"):
+        job.runs()
 
 
 def test_cli_flow_run(outputs, job_file, tmp_path, capsys):
@@ -169,8 +182,9 @@ def test_cli_flow_run(outputs, job_file, tmp_path, capsys):
 
     flows = tmp_path / "flows" / "tvl1_fast.yaml"
     main(["flow", "run", str(outputs[0]), "-f", str(flows), "--set", "gap=2", "-o", str(tmp_path / "quick"), "-q"])
-    assert (outputs[0].parent / "flow" / "tvl1_fast" / "tvl1_fast" / "flow.h5").exists()
-    assert (tmp_path / "quick" / "tvl1_fast" / "summary.csv").exists()
+    quick = tmp_path / "quick" / "tvl1_fast"
+    assert (quick / outputs[0].parent.parent.name / outputs[0].parent.name / "tvl1_fast" / "flow.h5").exists()
+    assert (quick / "summary.csv").exists()
 
     with pytest.raises(SystemExit, match="no flow has that setting"):
         main(["flow", "run", str(job_file), "--set", "lamda=0.2", "-q"])

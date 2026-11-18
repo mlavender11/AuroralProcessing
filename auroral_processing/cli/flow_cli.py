@@ -116,9 +116,9 @@ def add_parser(sub):
         "run",
         help="run a flow job file (inputs x flows x grid) and summarise the metrics",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Run a flow job file, or flow settings files on inputs. Each run goes to\n"
-        "<pipeline output>/flow/<job>/<run>/flow.h5 (other inputs: <job folder>/sources/<name>/<run>/);\n"
-        "the job folder <output>/<job>/ gets runs/ links, runs.csv and summary.csv.",
+        description="Run a flow job file, or flow settings files on inputs. Everything goes in the job\n"
+        "folder <output>/<job>/: each run in <source>/<pipeline output>/<run>/flow.h5 (other inputs:\n"
+        "<file name>/raw/<run>/), plus runs/ links, runs.csv and summary.csv.",
         epilog=RUN_EPILOG,
     )
     j.add_argument("target", nargs="+", help="flow job file (.yaml), or inputs: .h5 files, folders or globs")

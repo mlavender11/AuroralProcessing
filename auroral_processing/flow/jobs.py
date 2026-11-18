@@ -31,12 +31,12 @@ Flow job file (the job's name is the file name)::
     video_options: {}            # make_flow_video settings, e.g. {grid: 32, fps: 10}
     score: false                 # also run score_sweep on the job's runs
 
-Where results go:
+Where results go: everything is in the job folder ``<output>/<job>/``, nothing next to the inputs.
 
-* a pipeline output ``.../<output>/frames.h5``: ``.../<output>/flow/<job>/<run>/flow.h5``
-* any other source ``.../clip.h5``: ``<job folder>/sources/clip/<run>/flow.h5``
+* a pipeline output ``.../<source>/<output>/frames.h5``: ``<job folder>/<source>/<output>/<run>/flow.h5``
+* any other file ``.../clip.h5``: ``<job folder>/clip/raw/<run>/flow.h5``
 
-The job folder ``<output>/<job>/`` holds ``job.yaml`` (a copy), ``runs/<input>-<run>`` links to
+The job folder also holds ``job.yaml`` (a copy), ``runs/<input>-<run>`` links to
 every run, ``runs.csv`` (status of the last ``run_flow_job``) and ``summary.csv`` (one row per run
 with its pre-processing, flow settings and mean/median metrics, rebuilt from the flow files).
 """
@@ -212,7 +212,7 @@ class FlowJob:
     def runs(self) -> list[FlowRun]:
         """inputs x flows x grid combinations, each with its folder and compute_flow arguments."""
         self.check()
-        out, links = [], {}
+        out, links, folders = [], {}, {}
         for path in self.inputs:
             frames, times = self.datasets(path)
             pipeline = is_pipeline_output(path)
@@ -223,10 +223,13 @@ class FlowJob:
                           workers=self.workers, **flow.compute_kw())
                 for settings, params, ckw, vkw in expand_flow_grid(path, grid, flow.params, kw, self.video_options):
                     name = flow.label + (f"_{run_name(settings)}" if settings else "")
-                    if pipeline:
-                        folder, base = path.parent / "flow" / self.name / name, path.parent.name
+                    if pipeline:  # <job>/<source>/<output>/<run>
+                        folder, base = self.folder / path.parent.parent.name / path.parent.name / name, path.parent.name
                     else:
-                        folder, base = self.folder / "sources" / path.stem / name, path.stem
+                        folder, base = self.folder / path.stem / "raw" / name, path.stem
+                    if folders.setdefault(folder, path) != path:
+                        raise ValueError(f"{folders[folder]} and {path} would share the run folder {folder}; "
+                                         "give them different names or put them in separate jobs")
                     link = _unique(f"{base}-{name}", path, links)
                     out.append(FlowRun(path, flow, settings, name, link, folder, params, ckw, vkw))
         return out
@@ -382,6 +385,8 @@ def build_summary(job_folder) -> Path:
     job_folder = Path(job_folder)
     rows = []
     for link in sorted((job_folder / RUNS_DIR).iterdir()):
+        if link.name.startswith("."):  # e.g. macOS "._name" files beside links on exFAT drives
+            continue
         flow_path = link / "flow.h5"
         if not flow_path.exists():
             rows.append({"run": link.name, "status": "missing", "folder": os.path.realpath(link)})
