@@ -363,3 +363,32 @@ def test_cli_piv_sweep_compare_and_score(src, tmp_path):
     assert sorted(scores["run"]) == ["piv-window8", "tvl1-gamma1"]
     assert sorted(scores["method"]) == ["piv", "tvl1"] and scores["warp_lane"].notna().all()
     assert (tmp_path / "both" / "scores_heatmaps.png").exists()
+
+
+def test_ctrl_c_stops_workers_and_keeps_file(tmp_path):
+    """Ctrl+C (SIGINT to the whole process group) on a multi-worker run stops it promptly, with a resumable file."""
+    import os, signal, subprocess, sys, time
+
+    src = tmp_path / "big.h5"
+    with h5py.File(src, "w") as f:
+        f["rawimg"] = (np.random.default_rng(0).random((300, 192, 192)) * 3000 + 500).astype(np.uint16)
+        f["ut1_unix"] = 1.364e9 + np.arange(300) * 0.5
+    out = tmp_path / "flow.h5"
+    code = ("from auroral_processing.flow.compute_flow import compute_flow; "
+            f"compute_flow({str(src)!r}, {str(out)!r}, workers=2, chunk_size=4, progress=False)")
+    p = subprocess.Popen([sys.executable, "-c", code], start_new_session=True, stderr=subprocess.PIPE,
+                         preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
+    try:
+        time.sleep(8)  # imports, worker start-up, a few chunks
+        assert p.poll() is None, p.stderr.read().decode()
+        os.killpg(p.pid, signal.SIGINT)
+        p.wait(timeout=15)  # used to keep computing the whole run
+        time.sleep(0.5)
+        assert subprocess.run(["pgrep", "-g", str(p.pid)], capture_output=True).stdout == b""  # no workers left
+    finally:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)  # never leave a stuck run behind if the test fails
+        except ProcessLookupError:
+            pass
+    with h5py.File(out, "r") as f:  # closed properly: readable, and resumable from the saved pairs
+        assert 0 < f["done"][:].sum() < len(f["done"]) and not f.attrs["complete"]

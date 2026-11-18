@@ -6,6 +6,7 @@ from tqdm.auto import tqdm
 import numpy as np
 import h5py
 import cv2
+import signal
 
 from auroral_processing.flow.params import TVL1Params
 from auroral_processing.flow.methods import ESTIMATORS, make_estimator
@@ -108,6 +109,18 @@ def iter_flow(src, frames, pairs, ks, params, scaler, metrics=M.DEFAULT_METRICS,
 
 def _init_worker(threads):
     cv2.setNumThreads(threads)  # share the cores between workers instead of each using all of them
+    # Ctrl+C goes to the whole process group; only the main process should act on it (see _stop_pool)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def _stop_pool(pool):
+    """Cancel queued chunks and kill running workers now, instead of waiting for them to finish."""
+    pool.shutdown(wait=False, cancel_futures=True)
+    if hasattr(pool, "terminate_workers"):  # Python 3.14+
+        pool.terminate_workers()
+    else:
+        for proc in list((getattr(pool, "_processes", None) or {}).values()):
+            proc.terminate()
 
 
 def _run_chunk(*args):
@@ -243,12 +256,17 @@ def compute_flow(
             threads = max(1, cv2.getNumberOfCPUs() // workers)
             size = chunk_size or max(1, -(-len(todo) // (4 * workers)))
             chunks = [todo[i : i + size] for i in range(0, len(todo), size)]
-            with ProcessPoolExecutor(workers, initializer=_init_worker, initargs=(threads,)) as pool:
+            pool = ProcessPoolExecutor(workers, initializer=_init_worker, initargs=(threads,))
+            try:
                 futures = [pool.submit(_run_chunk, *args, c, params, scaler, metrics, warm_start) for c in chunks]
                 for fut in as_completed(futures):
                     for k, flow, m in fut.result():
                         writer.write(k, flow, m)
                         bar.update()
+            except BaseException:  # Ctrl+C or a failed chunk: keep what's written, stop the workers, close the file
+                _stop_pool(pool)
+                raise
+            pool.shutdown()
         bar.close()
         writer.finish()
     return out
