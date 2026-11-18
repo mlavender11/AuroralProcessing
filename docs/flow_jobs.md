@@ -87,7 +87,7 @@ score: false                            # also run `aurora flow score`
 | `grid` | none | Settings to sweep (§5) |
 | `metrics` | all three | `fb_error` doubles the run time. Drop it with `metrics: [warp_mae, zero_mae]`. |
 | `workers` | 1 | Parallel processes per run |
-| `video`, `video_options` | none | Videos per run, and options for them, e.g. `video_options: {grid: 32, fps: 10, vmax: 3}` |
+| `video`, `video_options` | none | Videos per run, saved in the job's `videos/` folder, and options for them, e.g. `video_options: {grid: 32, fps: 10, vmax: 3}` |
 | `score` | false | Run `aurora flow score` on all runs afterwards |
 
 Relative paths are relative to the job file's folder.
@@ -104,6 +104,7 @@ flow/chain_compare/                              <- the job folder
   runs.csv       status of each run from the last `aurora flow run`
   summary.csv    one row per run (below)
   runs/          a link to every run: <output>-<run>
+  videos/        <output>-<run>_quiver.mp4, <output>-<run>_speed.mp4 (with `video:`)
   2013-04-14-CamSer1387_extract/                 <- the source
     norm_only-4427dcf1/                          <- the pipeline output
       tvl1_default_lambda0.05/flow.h5
@@ -116,6 +117,7 @@ flow/chain_compare/                              <- the job folder
 - **Pipeline outputs:** `<job folder>/<source>/<output>/<run>/flow.h5`.
 - **Other inputs** (not pipeline outputs): `<job folder>/<file name>/raw/<run>/flow.h5`.
 - **Run name:** the flow's label plus each grid value, e.g. `tvl1_default_lambda0.05`.
+- **Videos:** all in `videos/`, named like the `runs/` links. A video found in a run folder (where they used to go) is moved there on the next run rather than made again.
 - **To delete a job, delete its folder.** Your pipeline outputs aren't affected. Deleting a pipeline output doesn't delete its flow, but its chain columns in `summary.csv` will be empty, because the chain is read from the output.
 - **Two inputs with the same source and output names** (for example, copies in two folders) would share run folders. That's an error, so put them in separate jobs.
 

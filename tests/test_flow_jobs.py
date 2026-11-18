@@ -190,3 +190,17 @@ def test_cli_flow_run(outputs, job_file, tmp_path, capsys):
         main(["flow", "run", str(job_file), "--set", "lamda=0.2", "-q"])
     with pytest.raises(SystemExit, match="--flow"):
         main(["flow", "run", str(outputs[0]), "-q"])
+
+
+def test_videos_go_in_the_job_folder(outputs, tmp_path):
+    flow = load_flow({"label": "tv", "params": FAST})
+    job = FlowJob("vid", outputs[:1], [flow], output=tmp_path / "flow", metrics=("warp_mae", "zero_mae"),
+                  video=["quiver"], video_options={"grid": 16})
+    run_flow_job(job, progress=False)
+    run = job.runs()[0]
+    video = job.folder / "videos" / f"{run.link}_quiver.mp4"
+    assert video.exists() and not list(run.folder.glob("*.mp4"))
+
+    video.rename(run.folder / "flow_quiver.mp4")  # a video where they used to go is moved, not re-made
+    assert run_flow_job(job, progress=False)["status"].tolist() == ["exists"]
+    assert video.exists() and not list(run.folder.glob("*.mp4"))

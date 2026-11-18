@@ -36,6 +36,8 @@ Where results go: everything is in the job folder ``<output>/<job>/``, nothing n
 * a pipeline output ``.../<source>/<output>/frames.h5``: ``<job folder>/<source>/<output>/<run>/flow.h5``
 * any other file ``.../clip.h5``: ``<job folder>/clip/raw/<run>/flow.h5``
 
+Videos go in ``<job folder>/videos/<input>-<run>_<kind>.mp4``.
+
 The job folder also holds ``job.yaml`` (a copy), ``runs/<input>-<run>`` links to
 every run, ``runs.csv`` (status of the last ``run_flow_job``) and ``summary.csv`` (one row per run
 with its pre-processing, flow settings and mean/median metrics, rebuilt from the flow files).
@@ -45,6 +47,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 import os
+import shutil
 import traceback
 import h5py
 import numpy as np
@@ -63,6 +66,7 @@ JOB_KEYS = {"output", "inputs", "frames", "times", "start", "stop", "flows", "gr
             "video", "video_options", "score"}
 VIDEO_KINDS = ("quiver", "speed")
 RUNS_DIR, RUNS_FILE, SUMMARY_FILE, JOB_COPY = "runs", "runs.csv", "summary.csv", "job.yaml"
+VIDEOS_DIR = "videos"
 
 
 # ---------- flow settings ----------
@@ -333,9 +337,14 @@ def run_flow_job(job: FlowJob, *, dry_run=False, force=False, progress=True) -> 
         try:
             compute_flow(run.input, flow_path, params=run.params, overwrite=force, progress=progress, **run.compute_kw)
             for kind in job.video:
-                video = run.folder / f"flow_{kind}.mp4"
-                if force and video.exists():
-                    video.unlink()
+                video = job.folder / VIDEOS_DIR / f"{run.link}_{kind}.mp4"
+                old = run.folder / f"flow_{kind}.mp4"  # where videos used to go
+                video.parent.mkdir(parents=True, exist_ok=True)
+                if force:
+                    video.unlink(missing_ok=True)
+                    old.unlink(missing_ok=True)
+                elif old.exists() and not video.exists():
+                    shutil.move(old, video)
                 if not video.exists():  # render under a temporary name so an interrupted video isn't skipped later
                     partial = video.with_suffix(".partial.mp4")
                     make_flow_video(flow_path, partial, kind=kind, progress=progress, **run.video_kw)
