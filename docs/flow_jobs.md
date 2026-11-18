@@ -24,7 +24,7 @@ The example runs TV-L1 with default settings on every pipeline output of the 2-m
 | | Path |
 |---|---|
 | **IN** | `optical_flow/processed/2013-03-27-CamSer7196_015400-015600/*/frames.h5` |
-| **OUT** (job folder) | `optical_flow/flow/example_chain_compare/`: `summary.csv`, `runs.csv`, `runs/`, `job.yaml` |
+| **OUT** (job folder) | `optical_flow/flow/example_chain_compare/`: `summary.csv`, `runs.csv`, `job.yaml` |
 | **OUT** (each run) | `optical_flow/flow/example_chain_compare/2013-03-27-CamSer7196_015400-015600/<output>/tvl1_default/flow.h5` |
 
 ---
@@ -103,7 +103,6 @@ flow/chain_compare/                              <- the job folder
   job.yaml       copy of the job file (plus any command-line --set/--grid)
   runs.csv       status of each run from the last `aurora flow run`
   summary.csv    one row per run (below)
-  runs/          a link to every run: <output>-<run>
   videos/        <output>-<run>_quiver.mp4, <output>-<run>_speed.mp4 (with `video:`)
   2013-04-14-CamSer1387_extract/                 <- the source
     norm_only-4427dcf1/                          <- the pipeline output
@@ -117,7 +116,8 @@ flow/chain_compare/                              <- the job folder
 - **Pipeline outputs:** `<job folder>/<source>/<output>/<run>/flow.h5`.
 - **Other inputs** (not pipeline outputs): `<job folder>/<file name>/raw/<run>/flow.h5`.
 - **Run name:** the flow's label plus each grid value, e.g. `tvl1_default_lambda0.05`.
-- **Videos:** all in `videos/`, named like the `runs/` links. A video found in a run folder (where they used to go) is moved there on the next run rather than made again.
+- **Videos:** all in `videos/`, named `<output>-<run>_<kind>.mp4`. A video found in a run folder (where they used to go) is moved there on the next run rather than made again.
+- **No links:** the job folder is plain files and folders. You can copy it anywhere with rsync, scp or a USB drive, and `summary.csv`, the videos and the flow files all still work.
 - **To delete a job, delete its folder.** Your pipeline outputs aren't affected. Deleting a pipeline output doesn't delete its flow, but its chain columns in `summary.csv` will be empty, because the chain is read from the output.
 - **Two inputs with the same source and output names** (for example, copies in two folders) would share run folders. That's an error, so put them in separate jobs.
 
@@ -174,7 +174,7 @@ There's one row per run. The first columns are the ones you compare:
 
 | Column | Meaning |
 |---|---|
-| `run` | `<output>-<run>` |
+| `run` | The run's folder inside the job folder, e.g. `2013-04-14-CamSer1387_extract/norm_only-4427dcf1/tvl1_default` |
 | `status` | `complete`, `partial` or `missing` |
 | `output`, `chain` | The pipeline output and its chain, e.g. `normalize > binned_temporal_average(bin_size=10) > …` |
 | **`warp_over_zero`** | mean warp_mae / mean zero_mae. **The fit score: lower is better.** |
@@ -187,8 +187,8 @@ Example from two `bin10` outputs of the test clip (first 10 pairs):
 
 | run | wiener.on | warp_over_zero | warp_mae | zero_mae | fb_error |
 |---|---|---|---|---|---|
-| …bin_size10_nowiener…-tvl1_default | False | 0.692 | 0.0434 | 0.0628 | 0.91 px |
-| …bin_size10_wiener…-tvl1_default | True | 0.721 | 0.0318 | 0.0441 | 0.88 px |
+| …/…bin_size10_nowiener…/tvl1_default | False | 0.692 | 0.0434 | 0.0628 | 0.91 px |
+| …/…bin_size10_wiener…/tvl1_default | True | 0.721 | 0.0318 | 0.0441 | 0.88 px |
 
 The Wiener filter lowers both residuals, because the frames are less noisy. But the flow explains a slightly smaller share of the change (0.72 vs 0.69), and the forward and backward flows agree slightly better (fb_error 0.88 vs 0.91). The *Flow Quality Metrics* guide explains how to weigh these.
 
@@ -200,7 +200,7 @@ s = pd.read_csv("flow/chain_compare/summary.csv")
 s.sort_values("warp_over_zero")[["output", "lambda", "warp_over_zero", "fb_error_mean"]]
 ```
 
-**Scoring.** For region-by-region scores (lanes vs diffuse glow, speeds, star pinning), set `score: true` or pass `--score`. This writes `scores.csv` and `scores_heatmaps.png` into the job folder. Afterwards you can also run `aurora flow score <job folder>/runs`.
+**Scoring.** For region-by-region scores (lanes vs diffuse glow, speeds, star pinning), set `score: true` or pass `--score`. This writes `scores.csv` and `scores_heatmaps.png` into the job folder. Afterwards you can also run `aurora flow score <job folder>`.
 
 ---
 

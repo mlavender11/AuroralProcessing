@@ -118,7 +118,8 @@ def add_parser(sub):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Run a flow job file, or flow settings files on inputs. Everything goes in the job\n"
         "folder <output>/<job>/: each run in <source>/<pipeline output>/<run>/flow.h5 (other inputs:\n"
-        "<file name>/raw/<run>/), plus runs/ links, runs.csv and summary.csv.",
+        "<file name>/raw/<run>/), videos in videos/, plus runs.csv and summary.csv. No links: copy the\n"
+        "job folder anywhere as plain files.",
         epilog=RUN_EPILOG,
     )
     j.add_argument("target", nargs="+", help="flow job file (.yaml), or inputs: .h5 files, folders or globs")

@@ -112,11 +112,13 @@ def test_run_layout_summary_rerun_and_force(outputs, job_file, tmp_path):
         for lam in ("0.1", "0.3"):
             assert (folder / out.parent.parent.name / out.parent.name / f"tvl1_fast_lambda{lam}" / "flow.h5").exists()
     assert (folder / "job.yaml").read_text() == job_file.read_text()
-    links = sorted(p.name for p in (folder / "runs").iterdir())
-    assert links == sorted(f"{o.parent.name}-tvl1_fast_lambda{lam}" for o in outputs for lam in ("0.1", "0.3"))
+    assert not any(p.is_symlink() for p in folder.rglob("*"))  # plain files only: copies anywhere
 
     s = pd.read_csv(folder / "summary.csv")
     assert len(s) == 4 and set(s["status"]) == {"complete"}
+    assert sorted(s["run"]) == sorted(f"{o.parent.parent.name}/{o.parent.name}/tvl1_fast_lambda{lam}"
+                                      for o in outputs for lam in ("0.1", "0.3"))
+    assert all((folder / r / "flow.h5").exists() for r in s["run"])
     for m in ("warp_mae", "zero_mae", "fb_error"):
         assert s[f"{m}_mean"].notna().all()
     assert (s["warp_over_zero"] < 1).all()  # the flow explains the translation
@@ -144,21 +146,22 @@ def test_raw_source_goes_to_job_folder_and_score(raw, tmp_path):
     run = tmp_path / "flow" / "rawjob" / raw.stem / "raw" / "tv" / "flow.h5"
     assert run.exists() and not (raw.parent / "flow").exists()  # nothing written next to the data
     folder = tmp_path / "flow" / "rawjob"
-    assert (folder / "runs" / f"{raw.stem}-tv").is_symlink()
-    assert (folder / "scores.csv").exists() and not (folder / "runs" / "scores.csv").exists()
+    assert (folder / "scores.csv").exists() and (folder / "scores_heatmaps.png").exists()
     s = pd.read_csv(folder / "summary.csv")
-    assert "output" not in s and s.loc[0, "warp_over_zero"] < 1
+    assert "output" not in s and s.loc[0, "warp_over_zero"] < 1 and s.loc[0, "run"] == f"{raw.stem}/raw/tv"
+    assert pd.read_csv(folder / "scores.csv")["run"].tolist() == [f"{raw.stem}/raw/tv"]
 
 
-def test_summary_reports_deleted_runs(outputs, job_file, tmp_path):
+def test_summary_lists_the_run_folders_present(outputs, job_file, tmp_path):
     import shutil
 
     run_flow_job(load_flow_job(job_file), progress=False)
     folder = tmp_path / "flow" / "compare"
     shutil.rmtree(folder / outputs[0].parent.parent.name / outputs[0].parent.name)  # delete one output's runs
-    (folder / "runs" / "._metadata").write_bytes(b"")  # what macOS leaves beside links on exFAT drives
+    (folder / "._metadata").write_bytes(b"")  # macOS clutter on exFAT drives is ignored
     s = pd.read_csv(build_summary(folder))
-    assert (s["status"] == "missing").sum() == 2 and (s["status"] == "complete").sum() == 2 and len(s) == 4
+    assert len(s) == 2 and set(s["status"]) == {"complete"}
+    assert all(r.startswith(outputs[1].parent.parent.name + "/" + outputs[1].parent.name) for r in s["run"])
 
 
 def test_inputs_that_would_share_a_run_folder_are_an_error(outputs, tmp_path):
@@ -198,7 +201,7 @@ def test_videos_go_in_the_job_folder(outputs, tmp_path):
                   video=["quiver"], video_options={"grid": 16})
     run_flow_job(job, progress=False)
     run = job.runs()[0]
-    video = job.folder / "videos" / f"{run.link}_quiver.mp4"
+    video = job.folder / "videos" / f"{run.tag}_quiver.mp4"
     assert video.exists() and not list(run.folder.glob("*.mp4"))
 
     video.rename(run.folder / "flow_quiver.mp4")  # a video where they used to go is moved, not re-made

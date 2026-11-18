@@ -38,9 +38,10 @@ Where results go: everything is in the job folder ``<output>/<job>/``, nothing n
 
 Videos go in ``<job folder>/videos/<input>-<run>_<kind>.mp4``.
 
-The job folder also holds ``job.yaml`` (a copy), ``runs/<input>-<run>`` links to
-every run, ``runs.csv`` (status of the last ``run_flow_job``) and ``summary.csv`` (one row per run
-with its pre-processing, flow settings and mean/median metrics, rebuilt from the flow files).
+The job folder also holds ``job.yaml`` (a copy), ``runs.csv`` (status of the last ``run_flow_job``)
+and ``summary.csv`` (one row per run folder found in the job folder, with its pre-processing, flow
+settings and mean/median metrics, rebuilt from the flow files). There are no links, so a job folder
+can be copied anywhere (rsync, scp, a USB drive) as plain files.
 """
 
 from __future__ import annotations
@@ -65,7 +66,7 @@ FLOW_KEYS = {"label", "method", "params", "gap", "stride", "warm_start", "clip",
 JOB_KEYS = {"output", "inputs", "frames", "times", "start", "stop", "flows", "grid", "metrics", "workers",
             "video", "video_options", "score"}
 VIDEO_KINDS = ("quiver", "speed")
-RUNS_DIR, RUNS_FILE, SUMMARY_FILE, JOB_COPY = "runs", "runs.csv", "summary.csv", "job.yaml"
+RUNS_FILE, SUMMARY_FILE, JOB_COPY = "runs.csv", "summary.csv", "job.yaml"
 VIDEOS_DIR = "videos"
 
 
@@ -165,7 +166,7 @@ class FlowRun:
     flow: FlowSpec
     settings: dict  # grid values
     name: str  # run folder name
-    link: str  # name in the job folder's runs/
+    tag: str  # <input>-<run>, unique within the job: used to name videos
     folder: Path
     params: object
     compute_kw: dict
@@ -216,7 +217,7 @@ class FlowJob:
     def runs(self) -> list[FlowRun]:
         """inputs x flows x grid combinations, each with its folder and compute_flow arguments."""
         self.check()
-        out, links, folders = [], {}, {}
+        out, tags, folders = [], {}, {}
         for path in self.inputs:
             frames, times = self.datasets(path)
             pipeline = is_pipeline_output(path)
@@ -234,8 +235,8 @@ class FlowJob:
                     if folders.setdefault(folder, path) != path:
                         raise ValueError(f"{folders[folder]} and {path} would share the run folder {folder}; "
                                          "give them different names or put them in separate jobs")
-                    link = _unique(f"{base}-{name}", path, links)
-                    out.append(FlowRun(path, flow, settings, name, link, folder, params, ckw, vkw))
+                    tag = _unique(f"{base}-{name}", path, tags)
+                    out.append(FlowRun(path, flow, settings, name, tag, folder, params, ckw, vkw))
         return out
 
 
@@ -312,7 +313,7 @@ def run_flow_job(job: FlowJob, *, dry_run=False, force=False, progress=True) -> 
 
     Returns a table of the runs: input, flow, run, folder and status ("done", "exists", "failed: ...",
     or with ``dry_run`` "would run" / "exists" / "partial" / "exists, different settings").
-    Afterwards writes the job folder: ``job.yaml``, ``runs/`` links, ``runs.csv`` and ``summary.csv``.
+    Afterwards writes the job folder: ``job.yaml``, ``runs.csv`` and ``summary.csv``.
     """
     from auroral_processing.products.flow_video import make_flow_video
 
@@ -321,7 +322,7 @@ def run_flow_job(job: FlowJob, *, dry_run=False, force=False, progress=True) -> 
     for n, run in enumerate(runs, 1):
         flow_path = run.folder / "flow.h5"
         row = {"input": _input_name(run.input), "flow": run.flow.label, "run": run.name, **run.settings,
-               "folder": str(run.folder)}
+               "folder": run.folder.relative_to(job.folder).as_posix()}
         complete = flow_path.exists() and _complete(flow_path)
         if dry_run:
             if not flow_path.exists() or force:
@@ -337,7 +338,7 @@ def run_flow_job(job: FlowJob, *, dry_run=False, force=False, progress=True) -> 
         try:
             compute_flow(run.input, flow_path, params=run.params, overwrite=force, progress=progress, **run.compute_kw)
             for kind in job.video:
-                video = job.folder / VIDEOS_DIR / f"{run.link}_{kind}.mp4"
+                video = job.folder / VIDEOS_DIR / f"{run.tag}_{kind}.mp4"
                 old = run.folder / f"flow_{kind}.mp4"  # where videos used to go
                 video.parent.mkdir(parents=True, exist_ok=True)
                 if force:
@@ -349,7 +350,6 @@ def run_flow_job(job: FlowJob, *, dry_run=False, force=False, progress=True) -> 
                     partial = video.with_suffix(".partial.mp4")
                     make_flow_video(flow_path, partial, kind=kind, progress=progress, **run.video_kw)
                     partial.rename(video)
-            _link(job.folder / RUNS_DIR / run.link, run.folder)
             row["status"] = "exists" if complete and not force else "done"
         except Exception as e:  # keep going: one bad input shouldn't stop the rest
             if progress:
@@ -363,7 +363,7 @@ def run_flow_job(job: FlowJob, *, dry_run=False, force=False, progress=True) -> 
         if job.source_text is not None:
             (job.folder / JOB_COPY).write_text(job.source_text + (f"\n# {job.note}\n" if job.note else ""))
         table.to_csv(job.folder / RUNS_FILE, index=False)
-        if (job.folder / RUNS_DIR).is_dir():
+        if run_folders(job.folder):
             build_summary(job.folder)
             if job.score:
                 score_job(job.folder, progress=progress)
@@ -374,40 +374,38 @@ def _input_name(path) -> str:
     return path.parent.name if path.name == "frames.h5" else path.stem
 
 
-def _link(link: Path, target: Path):
-    link.parent.mkdir(parents=True, exist_ok=True)
-    if link.is_symlink() or link.exists():
-        link.unlink()
-    link.symlink_to(target.resolve(), target_is_directory=True)
+def run_folders(job_folder) -> list[str]:
+    """Every run in a job folder: the folders holding a flow.h5, relative to the job folder, sorted."""
+    job_folder = Path(job_folder)
+    found = []
+    for root, dirs, files in os.walk(job_folder):  # doesn't follow links, e.g. an old runs/ folder
+        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and d != VIDEOS_DIR)
+        if "flow.h5" in files:
+            found.append(Path(root).relative_to(job_folder).as_posix())
+    return sorted(found)
 
 
 def build_summary(job_folder) -> Path:
     """
-    ``summary.csv`` of a job folder: one row per ``runs/`` link with the input's pre-processing
-    (chain and ``<stage>.<setting>`` columns), the flow settings, seconds per pair, and the mean and
-    median of each metric, plus ``warp_over_zero`` (mean warp_mae / mean zero_mae; lower is better).
-    Links whose run has been deleted are listed with ``status`` "missing".
+    ``summary.csv`` of a job folder: one row per run folder in it (``run`` is its path inside the job
+    folder) with the input's pre-processing (chain and ``<stage>.<setting>`` columns), the flow
+    settings, seconds per pair, and the mean and median of each metric, plus ``warp_over_zero``
+    (mean warp_mae / mean zero_mae; lower is better). A deleted run folder simply drops out.
     """
     from auroral_processing.flow.score import _preprocessing
     from auroral_processing.pipeline.jobs import fill_stage_columns
 
     job_folder = Path(job_folder)
     rows = []
-    for link in sorted((job_folder / RUNS_DIR).iterdir()):
-        if link.name.startswith("."):  # e.g. macOS "._name" files beside links on exFAT drives
-            continue
-        flow_path = link / "flow.h5"
-        if not flow_path.exists():
-            rows.append({"run": link.name, "status": "missing", "folder": os.path.realpath(link)})
-            continue
+    for name in run_folders(job_folder):
+        flow_path = job_folder / name / "flow.h5"
         with open_flow(flow_path) as f:
             cfg = read_config(f)
             dt = float(np.median(f["t1"][:] - f["t0"][:]))
         method, settings = read_method(cfg)
-        row = {"run": link.name, "status": "complete" if _complete(flow_path) else "partial",
+        row = {"run": name, "status": "complete" if _complete(flow_path) else "partial",
                **_preprocessing(cfg["source"]), "method": method, **settings,
-               "gap": cfg["gap"], "stride": cfg["stride"], "dt": dt, **summarise(flow_path),
-               "folder": os.path.realpath(link)}
+               "gap": cfg["gap"], "stride": cfg["stride"], "dt": dt, **summarise(flow_path)}
         if row.get("warp_mae_mean") and row.get("zero_mae_mean"):
             row["warp_over_zero"] = row["warp_mae_mean"] / row["zero_mae_mean"]
         rows.append(row)
@@ -421,12 +419,10 @@ def build_summary(job_folder) -> Path:
 
 
 def score_job(job_folder, progress=True) -> Path:
-    """``aurora flow score`` on a job's runs; scores.csv and the heatmaps go in the job folder."""
+    """
+    ``aurora flow score`` on a job's runs (the ``run`` column of its summary.csv); ``scores.csv``
+    and the heatmaps go in the job folder.
+    """
     from auroral_processing.flow.score import score_sweep
 
-    job_folder = Path(job_folder)
-    scores = score_sweep(job_folder / RUNS_DIR, plot=True, progress=progress)
-    for name in (scores.name, "scores_heatmaps.png"):
-        if (job_folder / RUNS_DIR / name).exists():
-            os.replace(job_folder / RUNS_DIR / name, job_folder / name)
-    return job_folder / scores.name
+    return score_sweep(job_folder, plot=True, progress=progress)
